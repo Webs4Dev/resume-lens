@@ -1,0 +1,789 @@
+{
+  "name": "Resume ATS Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "resume",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        -80
+      ],
+      "id": "28f39d79-657f-4694-a2a2-574805c53c9c",
+      "name": "Extract Resume Data"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "={{ $json.text }}"
+            },
+            {
+              "role": "system",
+              "content": "You are a resume parsing engine. You will be given raw text extracted from a PDF resume (formatting, line breaks, and spacing may be imperfect due to PDF extraction). Your job is to parse this text and return a single, strictly valid JSON object matching the schema below. Do not include any commentary, explanation, or markdown code fences — output ONLY the JSON object.\n\nRULES:\n- If a field is not present in the resume, use null (for strings/objects) or an empty array [] (for lists). Never fabricate information.\n- Normalize dates to \"MMM YYYY\" format where possible (e.g. \"Jan 2023\"). Use \"Present\" for ongoing roles.\n- Preserve the original wording of bullet points/descriptions — do not paraphrase or summarize.\n- Deduplicate skills; keep original casing for proper nouns (e.g. \"React\", \"Python\") but avoid redundant entries (e.g. \"ReactJS\" and \"React\" listed separately — pick one).\n- Infer section boundaries even if headers are inconsistently labeled (e.g. \"Work History\" = \"Experience\").\n- If contact info like email/phone appear anywhere in the text, extract them even if not under a clear header.\n-For projects, do not repeat the project description as a bullet. If a bullet is substantially identical to the project description,\nexclude that bullet.\n\nJSON SCHEMA:\n{\n  \"personal_info\": {\n    \"name\": string | null,\n    \"email\": string | null,\n    \"phone\": string | null\n  },\n  \"summary\": string | null,\n  \"education\": [\n    {\n      \"institution\": string,\n      \"degree\": string | null,\n      \"field_of_study\": string | null,\n      \"start_date\": string | null,\n      \"end_date\": string | null,\n      \"gpa\": string | null\n    }\n  ],\n  \"experience\": [\n    {\n      \"company\": string,\n      \"title\": string,\n      \"start_date\": string | null,\n      \"end_date\": string | null,\n      \"bullets\": [string],\n      \"technologies_used\": [string]\n    }\n  ],\n  \"projects\": [\n    {\n      \"name\": string,\n      \"description\": string,\n      \"bullets\": [string],\n      \"technologies_used\": [string],\n      \"date\": string | null\n    }\n  ],\n  \"skills\": {\n    \"languages\": [string],\n    \"frameworks_libraries\": [string],\n    \"tools_platforms\": [string],\n    \"other\": [string]\n  },\n  \"certifications\": [\n    {\n      \"name\": string,\n      \"issuer\": string | null,\n      \"date\": string | null\n    }\n  ],\n  \"achievements\": [string],\n  \"extracurricular\": [\n    {\n      \"organization\": string,\n      \"role\": string | null,\n      \"bullets\": [string],\n      \"date\": string | null\n    }\n  ],\n  \"publications\": [string]\n}\n\nReturn only the JSON object, nothing else."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        -80
+      ],
+      "id": "aca97fe9-3d09-41e7-805f-4fdda07a4c76",
+      "name": "Resume Parser",
+      "credentials": {
+        "openAiApi": {
+          "id": "rVMPcNWmxsYPgcr4",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "={{ $json.body.job_description }}"
+            },
+            {
+              "role": "system",
+              "content": "You are a job description parsing engine. You will be given raw text of a job description (JD), possibly copy-pasted from a job board with inconsistent formatting. Parse this text and return a single, strictly valid JSON object matching the schema below. Do not include any commentary, explanation, or markdown code fences — output ONLY the JSON object.\n\nRULES:\n- If a field is not present in the JD, use null (for strings) or an empty array [] (for lists). Never fabricate information.\n- Tag every skill/qualification as \"required\" or \"preferred\" based on JD signals (headers like \"Required\" vs \"Preferred\", or phrasing like \"must have\" vs \"bonus if you have\"). Default to \"required\" if unclear.\n- Extract skills as granular, individual, named technologies or concrete competencies (e.g. split \"Python/Java/C++\" into three separate entries). Do NOT extract broad domain/field names as standalone skills (e.g. do not add \"LLM\", \"AI\", \"Machine Learning\", \"Web Development\" as skill entries) — instead capture the specific named tools, frameworks, or techniques the JD mentions within that domain (e.g. \"LangChain\", \"RAG pipelines\", \"Prompt engineering\").\n- Normalize skill names to common casing (e.g. \"react.js\" → \"React\") but don't merge genuinely distinct technologies.\n- Deduplicate skills — if the same skill appears under multiple phrasings, keep one entry.\n- years_of_experience should be a number (minimum required) if stated, else null.\n- Keep responsibilities close to original wording — don't paraphrase into generic statements.\n- Infer section boundaries even if headers are inconsistently labeled (e.g. \"What you'll do\" = \"Responsibilities\").\n\nJSON SCHEMA:\n{\n  \"job_info\": {\n    \"title\": string | null,\n    \"company\": string | null\n  },\n  \"years_of_experience\": {\n    \"min\": number | null,\n    \"max\": number | null\n  },\n  \"education_requirements\": [string],\n  \"responsibilities\": [string],\n  \"skills\": [\n    {\n      \"name\": string,\n      \"category\": \"language\" | \"framework_library\" | \"tool_platform\" | \"other\",\n      \"priority\": \"required\" | \"preferred\"\n    }\n  ],\n  \"certifications\": [\n    {\n      \"name\": string,\n      \"priority\": \"required\" | \"preferred\"\n    }\n  ],\n  \"soft_skills\": [string]\n}\n\nReturn only the JSON object, nothing else."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        112
+      ],
+      "id": "3aded6f4-ee5b-4676-96a7-ad353b088ea7",
+      "name": "JD Parser",
+      "credentials": {
+        "openAiApi": {
+          "id": "rVMPcNWmxsYPgcr4",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import json\n\ndata = json.loads(_items[0][\"json\"][\"output\"][0][\"content\"][0][\"text\"])\n\nreturn [\n    {\n        \"json\": {\n            \"resume\": data,\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        -80
+      ],
+      "id": "79fecffa-ae67-48f1-9cf2-ce39611fb1cd",
+      "name": "Structure Resume JSON"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import json\n\ndata = json.loads(_items[0][\"json\"][\"output\"][0][\"content\"][0][\"text\"])\n\nreturn [\n    {\n        \"json\": {\n            \"jd\": data\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        112
+      ],
+      "id": "48d8d7ea-33c0-4872-8005-0c2220ef9a98",
+      "name": "Structure JD JSON"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        784,
+        16
+      ],
+      "id": "de7b5e09-07ae-4236-847c-b462db513d7f",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "items = _items\n\nresume = None\njd = None\n\nfor item in items:\n    data = item['json']\n    if data.get('resume'):\n        resume = data['resume']\n    if data.get('jd'):\n        jd = data['jd']\n\nif not resume or not jd:\n    raise Exception('Missing resume or jd in input items — check the Segregate node output')\n\nreturn [\n    {\n        'json': {\n            'resume': resume,\n            'jd': jd\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        176
+      ],
+      "id": "5b33cfdf-0e2f-4bae-9df6-1af6c5edcda5",
+      "name": "Combine Items"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3568,
+        32
+      ],
+      "id": "8d46fed3-eedb-4398-8f60-c1088b7d2efc",
+      "name": "Response"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "68803f6e-6c1a-4867-8829-69a8c0ca6ffb",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        16
+      ],
+      "id": "f6a55765-9d98-4168-8451-18ae4739a2f9",
+      "name": "Request",
+      "webhookId": "68803f6e-6c1a-4867-8829-69a8c0ca6ffb"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "resume = _items[0][\"json\"][\"resume\"]\njd = _items[0][\"json\"][\"jd\"]\n\nresume_evidence = []\njd_requirements = []\n\n\n# =========================================================\n# RESUME EVIDENCE\n# =========================================================\n\n# -------------------------\n# Skills\n# -------------------------\n\nskills = resume.get(\"skills\", {})\n\nif isinstance(skills, dict):\n\n    for category, skill_list in skills.items():\n\n        if not isinstance(skill_list, list):\n            continue\n\n        for skill in skill_list:\n\n            if not skill:\n                continue\n\n            resume_evidence.append({\n                \"id\": f\"skill_{len(resume_evidence) + 1}\",\n                \"type\": \"skill\",\n                \"category\": category,\n                \"text\": str(skill)\n            })\n\n\n# -------------------------\n# Projects\n# -------------------------\n\nprojects = resume.get(\"projects\", [])\n\nif isinstance(projects, list):\n\n    for project in projects:\n\n        project_name = project.get(\"name\", \"\")\n\n        description = project.get(\"description\", \"\")\n\n        technologies = project.get(\"technologies_used\", [])\n\n        bullets = project.get(\"bullets\", [])\n\n        # Project description\n        if description:\n\n            resume_evidence.append({\n                \"id\": f\"project_{len(resume_evidence) + 1}\",\n                \"type\": \"project\",\n                \"name\": project_name,\n                \"text\": description\n            })\n\n        # Project bullets\n        if isinstance(bullets, list):\n\n            for bullet in bullets:\n\n                if not bullet:\n                    continue\n\n                # Avoid duplicating description\n                if description and bullet.strip() == description.strip():\n                    continue\n\n                resume_evidence.append({\n                    \"id\": f\"project_{len(resume_evidence) + 1}\",\n                    \"type\": \"project\",\n                    \"name\": project_name,\n                    \"text\": bullet\n                })\n\n        # Technologies\n        if isinstance(technologies, list):\n\n            for technology in technologies:\n\n                if not technology:\n                    continue\n\n                resume_evidence.append({\n                    \"id\": f\"project_tech_{len(resume_evidence) + 1}\",\n                    \"type\": \"project_technology\",\n                    \"name\": project_name,\n                    \"text\": str(technology)\n                })\n\n\n# -------------------------\n# Experience\n# -------------------------\n\nexperience = resume.get(\"experience\", [])\n\nif isinstance(experience, list):\n\n    for exp in experience:\n\n        company = exp.get(\"company\", \"\")\n        title = exp.get(\"title\", \"\")\n\n        responsibilities = exp.get(\"responsibilities\", [])\n        technologies = exp.get(\"technologies\", [])\n\n        for responsibility in responsibilities:\n\n            if responsibility:\n\n                resume_evidence.append({\n                    \"id\": f\"experience_{len(resume_evidence) + 1}\",\n                    \"type\": \"experience\",\n                    \"company\": company,\n                    \"title\": title,\n                    \"text\": responsibility\n                })\n\n        for technology in technologies:\n\n            if technology:\n\n                resume_evidence.append({\n                    \"id\": f\"experience_tech_{len(resume_evidence) + 1}\",\n                    \"type\": \"experience_technology\",\n                    \"company\": company,\n                    \"title\": title,\n                    \"text\": technology\n                })\n\n\n# -------------------------\n# Education\n# -------------------------\n\neducation = resume.get(\"education\", [])\n\nif isinstance(education, list):\n\n    for edu in education:\n\n        institution = edu.get(\"institution\", \"\")\n        degree = edu.get(\"degree\", \"\")\n        field = edu.get(\"field_of_study\", \"\")\n        gpa = edu.get(\"gpa\", \"\")\n\n        text_parts = [\n            degree,\n            field,\n            institution\n        ]\n\n        if gpa:\n            text_parts.append(f\"GPA: {gpa}\")\n\n        text = \" | \".join(\n            str(x) for x in text_parts if x\n        )\n\n        if text:\n\n            resume_evidence.append({\n                \"id\": f\"education_{len(resume_evidence) + 1}\",\n                \"type\": \"education\",\n                \"text\": text\n            })\n\n\n# -------------------------\n# Certifications\n# -------------------------\n\ncertifications = resume.get(\"certifications\", [])\n\nif isinstance(certifications, list):\n\n    for cert in certifications:\n\n        if isinstance(cert, dict):\n\n            name = cert.get(\"name\", \"\")\n            issuer = cert.get(\"issuer\", \"\")\n\n            text = f\"{name} | {issuer}\".strip(\" |\")\n\n        else:\n            text = str(cert)\n\n        if text:\n\n            resume_evidence.append({\n                \"id\": f\"certification_{len(resume_evidence) + 1}\",\n                \"type\": \"certification\",\n                \"text\": text\n            })\n\n\n# -------------------------\n# Extracurricular\n# -------------------------\n\nextracurricular = resume.get(\"extracurricular\", [])\n\nif isinstance(extracurricular, list):\n\n    for activity in extracurricular:\n\n        organization = activity.get(\"organization\", \"\")\n        role = activity.get(\"role\", \"\")\n        bullets = activity.get(\"bullets\", [])\n\n        for bullet in bullets:\n\n            if bullet:\n\n                resume_evidence.append({\n                    \"id\": f\"extracurricular_{len(resume_evidence) + 1}\",\n                    \"type\": \"extracurricular\",\n                    \"organization\": organization,\n                    \"role\": role,\n                    \"text\": bullet\n                })\n\n\n# =========================================================\n# JD REQUIREMENTS\n# =========================================================\n\n# -------------------------\n# Technical skills\n# -------------------------\n\njd_skills = jd.get(\"skills\", [])\n\nif isinstance(jd_skills, list):\n\n    for skill in jd_skills:\n\n        if not isinstance(skill, dict):\n            continue\n\n        name = skill.get(\"name\", \"\")\n\n        if not name:\n            continue\n\n        jd_requirements.append({\n            \"id\": f\"jd_skill_{len(jd_requirements) + 1}\",\n            \"type\": \"technical_skill\",\n            \"text\": name,\n            \"category\": skill.get(\"category\"),\n            \"priority\": skill.get(\"priority\", \"preferred\")\n        })\n\n\n# -------------------------\n# Responsibilities\n# -------------------------\n\nresponsibilities = jd.get(\"responsibilities\", [])\n\nif isinstance(responsibilities, list):\n\n    for responsibility in responsibilities:\n\n        if not responsibility:\n            continue\n\n        jd_requirements.append({\n            \"id\": f\"jd_resp_{len(jd_requirements) + 1}\",\n            \"type\": \"responsibility\",\n            \"text\": responsibility,\n            \"priority\": \"required\"\n        })\n\n\n# -------------------------\n# Education requirements\n# -------------------------\n\neducation_requirements = jd.get(\n    \"education_requirements\",\n    []\n)\n\nif isinstance(education_requirements, list):\n\n    for requirement in education_requirements:\n\n        if not requirement:\n            continue\n\n        jd_requirements.append({\n            \"id\": f\"jd_edu_{len(jd_requirements) + 1}\",\n            \"type\": \"education\",\n            \"text\": str(requirement),\n            \"priority\": \"required\"\n        })\n\n\n# -------------------------\n# Soft skills\n# -------------------------\n\nsoft_skills = jd.get(\"soft_skills\", [])\n\nif isinstance(soft_skills, list):\n\n    for skill in soft_skills:\n\n        if not skill:\n            continue\n\n        jd_requirements.append({\n            \"id\": f\"jd_soft_{len(jd_requirements) + 1}\",\n            \"type\": \"soft_skill\",\n            \"text\": str(skill),\n            \"priority\": \"preferred\"\n        })\n\n\n# =========================================================\n# OUTPUT\n# =========================================================\n\nreturn [\n    {\n        \"json\": {\n            \"resume_evidence\": resume_evidence,\n            \"jd_requirements\": jd_requirements\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        176
+      ],
+      "id": "c9850e11-082b-4cf4-a4c6-903dd4b8ca9d",
+      "name": "Evidence Builder"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\nresume_evidence = _items[0][\"json\"][\"resume_evidence\"]\njd_requirements = _items[0][\"json\"][\"jd_requirements\"]\n\n# =========================================================\n# NORMALIZATION\n# =========================================================\n\ndef normalize_text(text):\n    if not text:\n        return \"\"\n\n    text = str(text).lower().strip()\n\n    # Common formatting differences\n    text = text.replace(\"-\", \" \")\n    text = text.replace(\"_\", \" \")\n\n    # Remove punctuation\n    punctuation = [\n        \".\", \",\", \":\", \";\", \"/\", \"\\\\\",\n        \"(\", \")\", \"[\", \"]\", \"{\", \"}\",\n        \"\\\"\", \"'\"\n    ]\n\n    for char in punctuation:\n        text = text.replace(char, \" \")\n\n    # Normalize whitespace\n    text = \" \".join(text.split())\n\n    return text\n\n\n# =========================================================\n# BUILD RESUME SKILL LOOKUP\n# =========================================================\n\nresume_skills = []\n\nfor evidence in resume_evidence:\n\n    if evidence.get(\"type\") != \"skill\":\n        continue\n\n    text = evidence.get(\"text\")\n\n    if not text:\n        continue\n\n    resume_skills.append({\n        \"id\": evidence.get(\"id\"),\n        \"text\": text,\n        \"normalized\": normalize_text(text),\n        \"evidence\": evidence\n    })\n\n\n# =========================================================\n# MATCH JD TECHNICAL SKILLS\n# =========================================================\n\nmatched_requirements = []\nunmatched_requirements = []\n\n\nfor requirement in jd_requirements:\n\n    # We only do exact matching for technical skills here\n    if requirement.get(\"type\") != \"technical_skill\":\n\n        unmatched_requirements.append({\n            **requirement,\n            \"match_status\": \"not_checked\",\n            \"match_method\": None,\n            \"matched_evidence\": []\n        })\n\n        continue\n\n\n    jd_text = requirement.get(\"text\")\n\n    jd_normalized = normalize_text(jd_text)\n\n    exact_matches = []\n\n\n    # Compare against resume skills\n    for resume_skill in resume_skills:\n\n        if resume_skill[\"normalized\"] == jd_normalized:\n\n            exact_matches.append(\n                resume_skill[\"evidence\"]\n            )\n\n\n    # -----------------------------------------\n    # Exact match found\n    # -----------------------------------------\n\n    if exact_matches:\n\n        matched_requirements.append({\n            **requirement,\n\n            \"match_status\": \"matched\",\n\n            \"match_method\": \"exact\",\n\n            \"confidence\": 1.0,\n\n            \"matched_evidence\": exact_matches\n        })\n\n\n    # -----------------------------------------\n    # No exact match\n    # -----------------------------------------\n\n    else:\n\n        unmatched_requirements.append({\n            **requirement,\n\n            \"match_status\": \"unmatched\",\n\n            \"match_method\": None,\n\n            \"confidence\": 0.0,\n\n            \"matched_evidence\": []\n        })\n\n\n# =========================================================\n# CALCULATE BASIC EXACT MATCH STATISTICS\n# =========================================================\n\ntechnical_requirements = [\n    req\n    for req in jd_requirements\n    if req.get(\"type\") == \"technical_skill\"\n]\n\n\ntotal_technical = len(technical_requirements)\n\nexact_matches_count = len(matched_requirements)\n\n\nif total_technical > 0:\n\n    exact_match_percentage = (\n        exact_matches_count\n        / total_technical\n    ) * 100\n\nelse:\n\n    exact_match_percentage = 100\n\n\n# =========================================================\n# OUTPUT\n# =========================================================\n\nreturn [\n    {\n        \"json\": {\n            \"resume_evidence\": resume_evidence,\n            \"jd_requirements\": jd_requirements,\n            \"matching\": {\n                \"exact_matches\":matched_requirements,\n                \"unmatched_requirements\":unmatched_requirements,\n\n                \"statistics\": {\n                    \"total_technical_requirements\":total_technical,\n                    \"exact_matches\":exact_matches_count,\n                    \"exact_match_percentage\":\n                        round(\n                            exact_match_percentage,\n                            2\n                        )\n                }\n            }\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        16
+      ],
+      "id": "2ac1b5ae-0b93-48d3-b781-3c57c8698728",
+      "name": "Exact Matcher"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "items = _items\ndata = items[0][\"json\"]\n\nresume_evidence = data.get(\"resume_evidence\", [])\nmatching = data.get(\"matching\", {})\n\nunmatched_requirements = matching.get(\n    \"unmatched_requirements\",\n    []\n)\n\n\n# =========================================================\n# Resume evidence we want to search\n# =========================================================\n\nsearchable_evidence = []\n\nfor evidence in resume_evidence:\n\n    evidence_type = evidence.get(\"type\")\n\n    # Don't embed raw project technologies separately.\n    # The project description/bullets contain richer context.\n    if evidence_type == \"project_technology\":\n        continue\n\n    text = evidence.get(\"text\")\n\n    if not text:\n        continue\n\n    searchable_evidence.append({\n        \"id\": evidence.get(\"id\"),\n        \"type\": evidence_type,\n        \"text\": text,\n        \"name\": evidence.get(\"name\"),\n        \"category\": evidence.get(\"category\"),\n        \"organization\": evidence.get(\"organization\"),\n        \"company\": evidence.get(\"company\")\n    })\n\n\n# =========================================================\n# Only requirements that need semantic matching\n# =========================================================\n\nembedding_requirements = []\n\nfor requirement in unmatched_requirements:\n\n    # Only semantic-match technical skills and responsibilities\n    if requirement.get(\"type\") not in [\n        \"technical_skill\",\n        \"responsibility\",\n        \"soft_skill\"\n    ]:\n        continue\n\n    embedding_requirements.append({\n        \"id\": requirement.get(\"id\"),\n        \"type\": requirement.get(\"type\"),\n        \"text\": requirement.get(\"text\"),\n        \"priority\": requirement.get(\"priority\"),\n        \"category\": requirement.get(\"category\")\n    })\n\n\n# =========================================================\n# Output\n# =========================================================\n\nreturn [\n    {\n        \"json\": {\n\n            # Keep previous matching information\n            \"matching\": matching,\n\n            # Resume chunks that will be embedded\n            \"embedding_evidence\": searchable_evidence,\n\n            # JD requirements that need semantic matching\n            \"embedding_requirements\": embedding_requirements,\n\n            \"embedding_stats\": {\n                \"evidence_count\":\n                    len(searchable_evidence),\n\n                \"requirements_to_match\":\n                    len(embedding_requirements)\n            }\n        }\n    }\n]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        16
+      ],
+      "id": "55af80a9-6144-4670-9fe6-feb9dfbb694d",
+      "name": "Prepare Embedding Input"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "items = _items\n\ndata = items[0][\"json\"]\n\nevidence = data.get(\"embedding_evidence\", [])\nrequirements = data.get(\"embedding_requirements\", [])\n\ntexts = []\nmetadata = []\n\n\n# Resume evidence\nfor item in evidence:\n\n    text = item.get(\"text\")\n\n    if not text:\n        continue\n\n    texts.append(text)\n\n    metadata.append({\n        \"embedding_type\": \"resume_evidence\",\n        \"source_id\": item.get(\"id\"),\n        \"source_type\": item.get(\"type\"),\n        \"source_name\": item.get(\"name\"),\n        \"text\": text\n    })\n\n\n# JD requirements\nfor item in requirements:\n\n    text = item.get(\"text\")\n\n    if not text:\n        continue\n\n    texts.append(text)\n\n    metadata.append({\n        \"embedding_type\": \"jd_requirement\",\n        \"source_id\": item.get(\"id\"),\n        \"source_type\": item.get(\"type\"),\n        \"priority\": item.get(\"priority\"),\n        \"text\": text\n    })\n\n\nreturn [\n    {\n        \"json\": {\n            \"model\": \"text-embedding-3-small\",\n            \"texts\": texts,\n            \"metadata\": metadata\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        112
+      ],
+      "id": "7743ff81-82b8-43b5-8adf-856b3562abc5",
+      "name": "Build Embedding Batch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"text-embedding-3-small\",\n  input: $json.texts\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        -80
+      ],
+      "id": "a46b0d2d-9cd2-4333-8f28-28503f266ae3",
+      "name": "OpenAI Vector Embedding",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CX91vh9rtvoZmodf",
+          "name": "HuggingFace"
+        },
+        "openAiApi": {
+          "id": "rVMPcNWmxsYPgcr4",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1632,
+        16
+      ],
+      "id": "d1fd8340-5a53-4312-8115-dce04f9e6b13",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import math\n\ndata = _items[0][\"json\"]\n\n# -----------------------------------------\n# Read merged data\n# -----------------------------------------\n\nembeddings = data[\"data\"]\nmetadata = data[\"metadata\"]\n\n# -----------------------------------------\n# Cosine similarity\n# -----------------------------------------\n\ndef cosine_similarity(vec1, vec2):\n    dot = 0.0\n    norm1 = 0.0\n    norm2 = 0.0\n\n    for a, b in zip(vec1, vec2):\n        dot += a * b\n        norm1 += a * a\n        norm2 += b * b\n\n    if norm1 == 0 or norm2 == 0:\n        return 0.0\n\n    return dot / (math.sqrt(norm1) * math.sqrt(norm2))\n\n# -----------------------------------------\n# Attach vectors to metadata\n# -----------------------------------------\n\nresume_vectors = []\njd_vectors = []\n\nfor emb in embeddings:\n    idx = emb[\"index\"]\n\n    item = {\n        \"embedding\": emb[\"embedding\"],\n        \"meta\": metadata[idx]\n    }\n\n    if metadata[idx][\"embedding_type\"] == \"resume_evidence\":\n        resume_vectors.append(item)\n\n    elif metadata[idx][\"embedding_type\"] == \"jd_requirement\":\n        jd_vectors.append(item)\n\n# -----------------------------------------\n# Retrieve Top 3 matches\n# -----------------------------------------\n\nsemantic_matches = []\n\nfor jd in jd_vectors:\n\n    candidates = []\n\n    for resume in resume_vectors:\n\n        similarity = cosine_similarity(\n            jd[\"embedding\"],\n            resume[\"embedding\"]\n        )\n\n        candidates.append({\n            \"similarity\": round(similarity, 4),\n            \"evidence_id\": resume[\"meta\"][\"source_id\"],\n            \"evidence_type\": resume[\"meta\"][\"source_type\"],\n            \"evidence_name\": resume[\"meta\"].get(\"source_name\"),\n            \"text\": resume[\"meta\"][\"text\"]\n        })\n\n    candidates.sort(\n        key=lambda x: x[\"similarity\"],\n        reverse=True\n    )\n\n    semantic_matches.append({\n        \"requirement\": {\n            \"id\": jd[\"meta\"][\"source_id\"],\n            \"type\": jd[\"meta\"][\"source_type\"],\n            \"text\": jd[\"meta\"][\"text\"],\n            \"priority\": jd[\"meta\"].get(\"priority\")\n        },\n        \"top_matches\": candidates[:3]\n    })\n\n# -----------------------------------------\n# Output\n# -----------------------------------------\n\nreturn [{\n    \"json\": {\n        \"semantic_matches\": semantic_matches,\n        \"statistics\": {\n            \"resume_evidence_count\": len(resume_vectors),\n            \"jd_requirement_count\": len(jd_vectors)\n        }\n    }\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        16
+      ],
+      "id": "315c9d3e-09ee-4493-9c2f-c76073f59ee1",
+      "name": "Calculate Similarity"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "items = _items\n\ndata = items[0][\"json\"]\n\nsemantic_matches = data.get(\n    \"semantic_matches\",\n    []\n)\n\njudge_inputs = []\n\nfor match in semantic_matches:\n\n    requirement = match[\"requirement\"]\n\n    top_matches = match.get(\n        \"top_matches\",\n        []\n    )\n\n    # Keep only the top 3 evidence items\n    evidence = []\n\n    for candidate in top_matches[:3]:\n\n        evidence.append({\n            \"evidence_id\":\n                candidate.get(\"evidence_id\"),\n\n            \"type\":\n                candidate.get(\"evidence_type\"),\n\n            \"name\":\n                candidate.get(\"evidence_name\"),\n\n            \"text\":\n                candidate.get(\"text\"),\n\n            \"similarity\":\n                candidate.get(\"similarity\")\n        })\n\n    judge_inputs.append({\n\n        \"requirement\": {\n\n            \"id\":\n                requirement.get(\"id\"),\n\n            \"type\":\n                requirement.get(\"type\"),\n\n            \"text\":\n                requirement.get(\"text\"),\n\n            \"priority\":\n                requirement.get(\"priority\")\n        },\n\n        \"evidence\":\n            evidence\n    })\n\n\nreturn [\n    {\n        \"json\": {\n            \"judge_inputs\": judge_inputs\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        176
+      ],
+      "id": "58140b93-af02-4f39-bdb5-454c08c28389",
+      "name": "Prepare LLM Judge"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an evidence-grounded ATS requirement evaluator.\n\nYour task is to evaluate how well the candidate's resume evidence supports\neach job requirement.\n\nYou MUST use the provided resume evidence as the primary source of truth.\n\nDo NOT invent experience, projects, skills, responsibilities, achievements,\nor outcomes.\n\nHowever, ATS evaluation should recognize transferable technical capabilities.\nDo NOT require the resume to use the exact wording of the job description.\n\nA candidate does not need to have performed the exact same task in the exact\nsame industry to receive credit for a transferable capability.\n\n==================================================\nDECISION DEFINITIONS\n==================================================\n\nEXACT\n\nUse when the resume directly and explicitly demonstrates the requirement.\n\nExample:\n\nResume:\n\"Implemented RAG pipelines using embeddings and vector search.\"\n\nRequirement:\n\"RAG pipelines\"\n\nDecision:\nEXACT\n\n\nSTRONG_MATCH\n\nUse when the resume demonstrates the underlying capability strongly, even if\nthe exact wording, application, product, or domain differs.\n\nSTRONG_MATCH is appropriate for transferable technical skills.\n\nExample:\n\nResume:\n\"Built a multi-agent research assistant using CrewAI and LangGraph.\"\n\nRequirement:\n\"Build AI agents.\"\n\nDecision:\nSTRONG_MATCH\n\nExample:\n\nResume:\n\"Built and deployed ML models with FastAPI APIs and an interactive\napplication.\"\n\nRequirement:\n\"Integrate AI modules into product workflows using APIs.\"\n\nDecision:\nSTRONG_MATCH or PARTIAL depending on how directly the integration\nrequirement is demonstrated.\n\n\nPARTIAL\n\nUse when the evidence demonstrates a meaningful related capability but\nimportant parts of the requirement are not established.\n\nExample:\n\nResume:\n\"Built an AI research assistant using RAG.\"\n\nRequirement:\n\"Develop and test prototypes for personalization, content generation,\nand learner engagement.\"\n\nDecision:\nPARTIAL\n\nThe candidate demonstrates relevant AI prototyping capability, but the\nspecific personalization and learner-engagement context is not established.\n\n\nNO_MATCH\n\nUse when the provided evidence is clearly unrelated to the requirement.\n\n\nINSUFFICIENT_EVIDENCE\n\nUse only when the provided resume evidence does not contain enough useful\ninformation to reasonably evaluate the requirement.\n\nDo NOT use INSUFFICIENT_EVIDENCE merely because the resume does not use the\nsame wording as the JD.\n\n==================================================\nTRANSFERABLE SKILL RULE\n==================================================\n\nRecognize transferable technical capabilities.\n\nThe candidate does NOT need to have worked in the same industry or used the\nexact same product.\n\nFor example:\n\nRAG research assistant\n→ relevant to RAG-powered learning features.\n\nMulti-agent research system\n→ relevant to AI-agent development.\n\nFastAPI ML deployment\n→ relevant to API-based AI integration.\n\nModel training and evaluation\n→ relevant to experimentation and model iteration.\n\nPrompt engineering in AI projects\n→ relevant to prompt engineering workflows.\n\nDocument retrieval/ranking\n→ relevant to evaluating relevance and retrieval quality.\n\nHowever, transferable evidence must still demonstrate a meaningful\nunderlying capability.\n\nDo NOT treat any vaguely related technology as proof of a capability.\n\n\n==================================================\nEVIDENCE STRENGTH\n==================================================\n\nUse this approximate evidence hierarchy:\n\n1. Direct project/experience evidence\n2. Project actions demonstrating transferable capability\n3. Multiple related project pieces of evidence\n4. Relevant extracurricular evidence\n5. Skills listed in the Skills section\n6. Certifications\n\nProject evidence should generally carry substantially more weight than\nisolated skill or certification entries.\n\nA certification can support knowledge or awareness, but should not by itself\nprove practical implementation.\n\n\n==================================================\nTECHNICAL SKILLS\n==================================================\n\nFor technical skills, recognize equivalent terminology and closely related\nimplementations.\n\nExamples:\n\n\"RAG\" can satisfy \"RAG pipelines\" when the project context demonstrates\nactual implementation.\n\n\"CrewAI\", \"LangGraph\", or multi-agent orchestration can provide strong\nevidence for \"AI agents\" when the surrounding project evidence demonstrates\nagent-based implementation.\n\n\"FastAPI\" and deployed APIs can support API integration requirements when\nthe project context demonstrates actual use.\n\nDo not require exact keyword matches.\n\n\n==================================================\nRESPONSIBILITIES\n==================================================\n\nFor responsibilities, evaluate the underlying capabilities rather than\nrequiring the candidate to have performed the exact responsibility before.\n\nBreak complex responsibilities into their meaningful components.\n\nFor example:\n\n\"Build and experiment with LLM-powered features including RAG pipelines,\nAI agents, and prompt engineering workflows.\"\n\nConsider separately:\n\n- LLM experience\n- RAG experience\n- agent experience\n- prompt engineering\n- experimentation/prototyping\n\nIf the candidate demonstrates several of these capabilities, award\nSTRONG_MATCH or PARTIAL based on coverage.\n\nDo not require the candidate to have performed all components in the exact\nsame product domain.\n\nFor example, lack of education-domain experience should not erase strong\ngeneral LLM/RAG/agent experience.\n\n\n==================================================\nSOFT SKILLS\n==================================================\n\nSoft skills require behavioral evidence.\n\nDo not infer a soft skill solely from technical skills.\n\nHowever, relevant activities can provide transferable evidence.\n\nExample:\n\n\"Collaborated with an editorial team and created newsletters and reports.\"\n\nThis is meaningful evidence for communication and collaboration.\n\nIt may support:\n\n\"Communicate clearly with non-technical stakeholders.\"\n\nIt should not automatically establish:\n\n\"Ability to work independently.\"\n\n==================================================\nEDUCATION\n==================================================\n\nEducation alternatives should be treated as alternatives.\n\nIf the JD accepts:\n\nB.Tech, M.Tech, or MCA\n\nand the candidate has B.Tech:\n\nB.Tech → EXACT\nM.Tech → NOT_APPLICABLE\nMCA → NOT_APPLICABLE\n\nDo not penalize the candidate for not having alternative degrees.\n\n\n==================================================\nCONFIDENCE\n==================================================\n\nConfidence represents how certain you are that the decision is supported\nby the provided evidence.\n\n0.90 - 1.00:\nDirect and very strong evidence.\n\n0.75 - 0.89:\nStrong evidence with minor ambiguity.\n\n0.50 - 0.74:\nMeaningful transferable or partial evidence.\n\n0.25 - 0.49:\nWeak or highly indirect evidence.\n\n0.00 - 0.24:\nLittle or no useful evidence.\n\nConfidence is NOT the candidate's score.\n\n==================================================\nIMPORTANT RULES\n==================================================\n\n1. Do not reward keyword overlap alone.\n\n2. Do not require exact wording.\n\n3. Recognize transferable technical capabilities.\n\n4. Do not require the same industry or domain for technical skills.\n\n5. For complex responsibilities, evaluate component coverage.\n\n6. Do not let one missing component erase several demonstrated components.\n\n7. Certifications support knowledge but do not prove implementation by\n   themselves.\n\n8. Skills listed alone are weaker than project evidence.\n\n9. Never invent evidence.\n\n10. Only reference evidence IDs that exist in the provided input.\n\n11. Every EXACT, STRONG_MATCH, or PARTIAL decision must contain at least\n    one supporting evidence ID.\n\n12. Use INSUFFICIENT_EVIDENCE only when there is genuinely insufficient\n    useful evidence.\n\n13. The embedding similarity score is only a retrieval signal.\n\n14. Do not use a similarity threshold as proof of a match.\n\n15. Never calculate the overall ATS score.\n\n==================================================\nEVIDENCE VALIDITY RULE\n==================================================\nOnly include an evidence_id when the corresponding evidence actually\nsupports the decision.\n\nIf the decision is INSUFFICIENT_EVIDENCE, evidence_ids should normally\nbe an empty array.\n\nDo not attach evidence merely because it is semantically related to the\nrequirement.\n\nFor example:\n\nRequirement:\n\"Work closely with product managers and learning scientists.\"\n\nEvidence:\n\"Built an AI research assistant.\"\n\nThis evidence is related to AI development but does NOT establish\ncollaboration with product managers or learning scientists.\n\nTherefore:\n\ndecision = INSUFFICIENT_EVIDENCE\nevidence_ids = []\n\nDo not use unrelated evidence to justify an insufficient-evidence decision.\n\n==================================================\nSOFT SKILL EVIDENCE RULE\n==================================================\nSoft skills require behavioral evidence.\n\nDo not infer:\n\n\"Prompt Engineering\" → \"asks the right questions\"\n\n\"Has projects\" → \"works independently\"\n\n\"Has technical projects\" → \"builder's mindset\"\n\n\"Technical skills\" → \"communication with non-technical stakeholders\"\n\nA soft skill should receive PARTIAL or STRONG_MATCH only when the resume\ncontains behavioral evidence that reasonably demonstrates it.\n\n==================================================\nOUTPUT FORMAT\n==================================================\n\nReturn ONLY valid JSON.\n\nDo NOT use Markdown.\n\nDo NOT wrap the JSON in code fences.\n\nDo NOT output anything before or after the JSON.\n\nReturn exactly:\n\n{\n  \"evaluations\": [\n    {\n      \"requirement_id\": \"string\",\n      \"decision\": \"EXACT\",\n      \"confidence\": 0.0,\n      \"evidence_ids\": [],\n      \"comment\": \"Brief evidence-grounded explanation.\"\n    }\n  ]\n}\n\n==================================================\nOUTPUT RULES\n==================================================\n\n\"evaluations\" must contain exactly one evaluation for every JD requirement\nprovided.\n\n\"requirement_id\" must exactly match the input requirement ID.\n\n\"decision\" must be exactly one of:\n\nEXACT\nSTRONG_MATCH\nPARTIAL\nNO_MATCH\nINSUFFICIENT_EVIDENCE\n\n\"confidence\" must be between 0 and 1.\n\n\"evidence_ids\" must contain only IDs from the provided resume evidence.\n\n\"comment\" must briefly explain the reasoning using only the provided\nevidence.\n\nDo not output ATS score, matching skills, missing skills, strengths, or\nrecommendations.\n\nOUTPUT FORMAT REQUIREMENTS\n\nReturn exactly one JSON object.\n\nDo not use Markdown.\n\nDo not wrap the JSON in ```json or ```.\n\nDo not write any text before or after the JSON.\n\nJSON SAFETY RULES:\n\n- All property names must use double quotes.\n- All string values must use double quotes.\n- Escape double quotes inside string values with \\\".\n- Never include literal newlines inside string values.\n- Never include Markdown.\n- Never include trailing commas.\n- Never return comments outside the JSON object.\n- confidence must be a number between 0 and 1.\n- evidence_ids must always be an array.\n- Return one evaluation for every supplied requirement."
+            },
+            {
+              "content": "=Evaluate every requirement in the following JSON.\n\n{{ JSON.stringify($json.judge_inputs) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2048,
+        16
+      ],
+      "id": "75376464-7c6c-45a9-92e2-49cdb3559310",
+      "name": "LLM Judge",
+      "credentials": {
+        "openAiApi": {
+          "id": "rVMPcNWmxsYPgcr4",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import json\n\n\n# =========================================================\n# GET LLM RESPONSE\n# =========================================================\n\nitem = _items[0][\"json\"]\n\noutput = item.get(\"output\")\n\nif not output:\n    raise Exception(\"LLM output is missing.\")\n\n\n# output is expected to be an array\nif not isinstance(output, list):\n    raise Exception(\"Unexpected LLM output structure.\")\n\n\nmessage = output[0]\n\ncontent = message.get(\"content\")\n\nif not content or not isinstance(content, list):\n    raise Exception(\"LLM content is missing.\")\n\n\ntext = content[0].get(\"text\", \"\").strip()\n\nif not text:\n    raise Exception(\"LLM returned empty text.\")\n\n\n# =========================================================\n# PARSE JSON\n# =========================================================\n\ntry:\n    result = json.loads(text)\n\nexcept json.JSONDecodeError as e:\n\n    raise Exception(\n        f\"LLM returned invalid JSON: {str(e)}\"\n    )\n\n\n# =========================================================\n# BASIC STRUCTURE VALIDATION\n# =========================================================\n\nif not isinstance(result, dict):\n\n    raise Exception(\n        \"LLM output must be a JSON object.\"\n    )\n\n\nevaluations = result.get(\"evaluations\")\n\nif not isinstance(evaluations, list):\n\n    raise Exception(\n        \"'evaluations' must be an array.\"\n    )\n\n\n# =========================================================\n# EXPECTED DECISIONS\n# =========================================================\n\nallowed_decisions = {\n    \"EXACT\",\n    \"STRONG_MATCH\",\n    \"PARTIAL\",\n    \"NO_MATCH\",\n    \"INSUFFICIENT_EVIDENCE\"\n}\n\n\n# =========================================================\n# VALIDATE EVALUATIONS\n# =========================================================\n\nseen_ids = set()\n\nvalidation_errors = []\n\nvalid_evaluations = []\n\n\nfor evaluation in evaluations:\n\n    # -----------------------------------------\n    # Required fields\n    # -----------------------------------------\n\n    required_fields = [\n        \"requirement_id\",\n        \"decision\",\n        \"confidence\",\n        \"evidence_ids\",\n        \"comment\"\n    ]\n\n    for field in required_fields:\n\n        if field not in evaluation:\n\n            validation_errors.append(\n                f\"Missing field '{field}'\"\n            )\n\n\n    requirement_id = evaluation.get(\n        \"requirement_id\"\n    )\n\n    decision = evaluation.get(\n        \"decision\"\n    )\n\n    confidence = evaluation.get(\n        \"confidence\"\n    )\n\n    evidence_ids = evaluation.get(\n        \"evidence_ids\"\n    )\n\n\n    # -----------------------------------------\n    # Duplicate requirement\n    # -----------------------------------------\n\n    if requirement_id in seen_ids:\n\n        validation_errors.append(\n            f\"Duplicate requirement_id: {requirement_id}\"\n        )\n\n    seen_ids.add(requirement_id)\n\n\n    # -----------------------------------------\n    # Validate decision\n    # -----------------------------------------\n\n    if decision not in allowed_decisions:\n\n        validation_errors.append(\n            f\"Invalid decision '{decision}' \"\n            f\"for {requirement_id}\"\n        )\n\n\n    # -----------------------------------------\n    # Validate confidence\n    # -----------------------------------------\n\n    if not isinstance(\n        confidence,\n        (int, float)\n    ):\n\n        validation_errors.append(\n            f\"Invalid confidence for {requirement_id}\"\n        )\n\n    elif not 0 <= confidence <= 1:\n\n        validation_errors.append(\n            f\"Confidence outside [0,1] \"\n            f\"for {requirement_id}\"\n        )\n\n\n    # -----------------------------------------\n    # Validate evidence_ids\n    # -----------------------------------------\n\n    if not isinstance(\n        evidence_ids,\n        list\n    ):\n\n        validation_errors.append(\n            f\"evidence_ids must be an array \"\n            f\"for {requirement_id}\"\n        )\n\n\n    # -----------------------------------------\n    # Positive decisions require evidence\n    # -----------------------------------------\n\n    if decision in {\n        \"EXACT\",\n        \"STRONG_MATCH\",\n        \"PARTIAL\"\n    }:\n\n        if not evidence_ids:\n\n            validation_errors.append(\n                f\"{decision} requires evidence \"\n                f\"for {requirement_id}\"\n            )\n\n\n    valid_evaluations.append(evaluation)\n\n\n# =========================================================\n# RESULT\n# =========================================================\n\nis_valid = len(validation_errors) == 0\n\n\nreturn [\n    {\n        \"json\": {\n\n            \"judge_result\": {\n                \"evaluations\":\n                    valid_evaluations\n            },\n\n            \"validation\": {\n\n                \"is_valid\":\n                    is_valid,\n\n                \"error_count\":\n                    len(validation_errors),\n\n                \"errors\":\n                    validation_errors\n            }\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        16
+      ],
+      "id": "e6d87c56-5e44-418d-8a0d-203154b84d11",
+      "name": "Parse & Validate Judge"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2448,
+        -240
+      ],
+      "id": "c9b01076-d251-4df5-bbc6-5d2ead93c054",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "data = _items[0][\"json\"]\n\n# =====================================================\n# GET DATA\n# =====================================================\n\njd_requirements = data[\"jd_requirements\"]\nmatching = data[\"matching\"]\n\nexact_matches = matching.get(\"exact_matches\", [])\n\njudge_result = data.get(\"judge_result\", {})\njudge_evaluations = judge_result.get(\"evaluations\", [])\n\nresume_evidence = data.get(\"resume_evidence\", [])\n\n\n# =====================================================\n# CREATE LOOKUP TABLE FOR LLM RESULTS\n# =====================================================\n\njudge_map = {}\n\nfor evaluation in judge_evaluations:\n    requirement_id = evaluation.get(\"requirement_id\")\n    judge_map[requirement_id] = evaluation\n\n\n# =====================================================\n# CREATE LOOKUP TABLE FOR EXACT MATCHES\n# =====================================================\n\nexact_map = {}\n\nfor match in exact_matches:\n    requirement_id = match.get(\"id\")\n    exact_map[requirement_id] = match\n\n\n# =====================================================\n# EDUCATION MATCHING\n# =====================================================\n\neducation_evidence = [\n    e for e in resume_evidence\n    if e.get(\"type\") == \"education\"\n]\n\neducation_requirements = [\n    req for req in jd_requirements\n    if req.get(\"type\") == \"education\"\n]\n\ndegree_aliases = {\n    \"b.tech\": [\n        \"b.tech\",\n        \"btech\",\n        \"bachelor of technology\"\n    ],\n    \"m.tech\": [\n        \"m.tech\",\n        \"mtech\",\n        \"master of technology\"\n    ],\n    \"mca\": [\n        \"mca\",\n        \"master of computer applications\"\n    ]\n}\n\n\n# Find the accepted degree held by the candidate\n\nmatched_degree = None\nmatched_education_ids = []\n\nfor education in education_evidence:\n\n    text = education.get(\"text\", \"\").lower()\n\n    for degree, aliases in degree_aliases.items():\n\n        if any(alias in text for alias in aliases):\n\n            matched_degree = degree\n\n            matched_education_ids.append(\n                education.get(\"id\")\n            )\n\n            break\n\n    if matched_degree:\n        break\n\n\n# =====================================================\n# BUILD COMPLETE REQUIREMENT EVALUATIONS\n# =====================================================\n\nfinal_evaluations = []\n\nfor requirement in jd_requirements:\n\n    requirement_id = requirement[\"id\"]\n\n\n    # -----------------------------------------\n    # EDUCATION REQUIREMENT\n    # -----------------------------------------\n\n    if requirement.get(\"type\") == \"education\":\n\n        degree = requirement.get(\n            \"text\",\n            \"\"\n        ).lower()\n\n        if matched_degree == degree:\n\n            final_evaluations.append({\n                \"requirement_id\": requirement_id,\n                \"type\": \"education\",\n                \"category\": requirement.get(\"category\"),\n                \"priority\": requirement.get(\"priority\"),\n                \"text\": requirement.get(\"text\"),\n                \"decision\": \"EXACT\",\n                \"confidence\": 1.0,\n                \"evidence_ids\": matched_education_ids,\n                \"match_method\": \"education_match\",\n                \"comment\": (\n                    \"Candidate holds the accepted \"\n                    + requirement.get(\"text\", \"\")\n                    + \" degree.\"\n                )\n            })\n\n        else:\n\n            final_evaluations.append({\n                \"requirement_id\": requirement_id,\n                \"type\": \"education\",\n                \"category\": requirement.get(\"category\"),\n                \"priority\": requirement.get(\"priority\"),\n                \"text\": requirement.get(\"text\"),\n                \"decision\": \"NOT_APPLICABLE\",\n                \"confidence\": 1.0,\n                \"evidence_ids\": [],\n                \"match_method\": \"education_alternative\",\n                \"comment\": (\n                    \"This is an alternative education \"\n                    \"requirement. Another accepted degree \"\n                    \"has already satisfied the education \"\n                    \"criterion.\"\n                )\n            })\n\n        continue\n\n\n    # -----------------------------------------\n    # EXACT MATCH\n    # -----------------------------------------\n\n    if requirement_id in exact_map:\n\n        match = exact_map[requirement_id]\n\n        final_evaluations.append({\n            \"requirement_id\": requirement_id,\n            \"type\": requirement.get(\"type\"),\n            \"category\": requirement.get(\"category\"),\n            \"priority\": requirement.get(\"priority\"),\n            \"text\": requirement.get(\"text\"),\n            \"decision\": \"EXACT\",\n            \"confidence\": match.get(\"confidence\", 1.0),\n            \"evidence_ids\": [\n                evidence[\"id\"]\n                for evidence in match.get(\n                    \"matched_evidence\",\n                    []\n                )\n            ],\n            \"match_method\": \"exact\",\n            \"comment\": \"Exact match found in resume evidence.\"\n        })\n\n        continue\n\n\n    # -----------------------------------------\n    # LLM JUDGE RESULT\n    # -----------------------------------------\n\n    if requirement_id in judge_map:\n\n        evaluation = judge_map[requirement_id]\n\n        final_evaluations.append({\n            \"requirement_id\": requirement_id,\n            \"type\": requirement.get(\"type\"),\n            \"category\": requirement.get(\"category\"),\n            \"priority\": requirement.get(\"priority\"),\n            \"text\": requirement.get(\"text\"),\n            \"decision\": evaluation.get(\"decision\"),\n            \"confidence\": evaluation.get(\"confidence\"),\n            \"evidence_ids\": evaluation.get(\n                \"evidence_ids\",\n                []\n            ),\n            \"match_method\": \"semantic_llm_judge\",\n            \"comment\": evaluation.get(\n                \"comment\",\n                \"\"\n            )\n        })\n\n        continue\n\n\n    # -----------------------------------------\n    # NO EVALUATION FOUND\n    # -----------------------------------------\n\n    final_evaluations.append({\n        \"requirement_id\": requirement_id,\n        \"type\": requirement.get(\"type\"),\n        \"category\": requirement.get(\"category\"),\n        \"priority\": requirement.get(\"priority\"),\n        \"text\": requirement.get(\"text\"),\n        \"decision\": \"INSUFFICIENT_EVIDENCE\",\n        \"confidence\": 0.0,\n        \"evidence_ids\": [],\n        \"match_method\": \"not_evaluated\",\n        \"comment\": \"No evaluation was produced.\"\n    })\n\n\n# =====================================================\n# VALIDATION\n# =====================================================\n\nexpected_ids = {\n    requirement[\"id\"]\n    for requirement in jd_requirements\n}\n\nactual_ids = {\n    evaluation[\"requirement_id\"]\n    for evaluation in final_evaluations\n}\n\nmissing_ids = list(expected_ids - actual_ids)\nextra_ids = list(actual_ids - expected_ids)\n\n\nif missing_ids:\n    raise Exception(\n        \"Missing requirement evaluations: \"\n        + \", \".join(missing_ids)\n    )\n\nif extra_ids:\n    raise Exception(\n        \"Unexpected requirement evaluations: \"\n        + \", \".join(extra_ids)\n    )\n\n\n# =====================================================\n# STATISTICS\n# =====================================================\n\ndecision_counts = {\n    \"EXACT\": 0,\n    \"STRONG_MATCH\": 0,\n    \"PARTIAL\": 0,\n    \"NO_MATCH\": 0,\n    \"INSUFFICIENT_EVIDENCE\": 0,\n    \"NOT_APPLICABLE\": 0\n}\n\nfor evaluation in final_evaluations:\n\n    decision = evaluation[\"decision\"]\n\n    if decision in decision_counts:\n        decision_counts[decision] += 1\n\n\n# =====================================================\n# OUTPUT\n# =====================================================\n\nreturn [\n    {\n        \"json\": {\n            **data,\n            \"final_evaluations\": final_evaluations,\n            \"statistics\": {\n                \"total_requirements\": len(final_evaluations),\n                \"exact\": decision_counts[\"EXACT\"],\n                \"strong_match\": decision_counts[\"STRONG_MATCH\"],\n                \"partial\": decision_counts[\"PARTIAL\"],\n                \"no_match\": decision_counts[\"NO_MATCH\"],\n                \"insufficient_evidence\": decision_counts[\"INSUFFICIENT_EVIDENCE\"],\n                \"not_applicable\": decision_counts[\"NOT_APPLICABLE\"]\n            }\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2576,
+        16
+      ],
+      "id": "47d7f7de-7962-4a15-9085-eab84298027e",
+      "name": "Final Evaluation"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "data = _items[0][\"json\"]\n\nfinal_evaluations = data.get(\n    \"final_evaluations\",\n    []\n)\n\nif not final_evaluations:\n    raise Exception(\"No final evaluations found.\")\n\n\n# =====================================================\n# CONFIGURATION\n# =====================================================\n\nDECISION_SCORES = {\n    \"EXACT\": 1.00,\n    \"STRONG_MATCH\": 0.85,\n    \"PARTIAL\": 0.50,\n    \"NO_MATCH\": 0.00,\n    \"INSUFFICIENT_EVIDENCE\": 0.00\n}\n\nPRIORITY_WEIGHTS = {\n    \"required\": 1.0,\n    \"preferred\": 0.5\n}\n\nCATEGORY_WEIGHTS = {\n    \"technical_skill\": 0.40,\n    \"responsibility\": 0.40,\n    \"education\": 0.10,\n    \"soft_skill\": 0.10\n}\n\n\n# =====================================================\n# CALCULATE REQUIREMENT SCORE\n# =====================================================\n\ndef get_requirement_score(evaluation):\n\n    decision = evaluation.get(\n        \"decision\"\n    )\n\n    if decision == \"NOT_APPLICABLE\":\n        return None\n\n    base_score = DECISION_SCORES.get(\n        decision,\n        0.0\n    )\n\n    priority = evaluation.get(\n        \"priority\",\n        \"required\"\n    )\n\n    priority_weight = PRIORITY_WEIGHTS.get(\n        priority,\n        1.0\n    )\n\n    weighted_score = (\n        base_score *\n        priority_weight\n    )\n\n    return weighted_score\n\n\n# =====================================================\n# GROUP BY CATEGORY\n# =====================================================\n\ncategories = {\n    \"technical_skill\": [],\n    \"responsibility\": [],\n    \"education\": [],\n    \"soft_skill\": []\n}\n\nfor evaluation in final_evaluations:\n\n    category = evaluation.get(\n        \"type\"\n    )\n\n    if category in categories:\n\n        categories[category].append(\n            evaluation\n        )\n\n\n# =====================================================\n# CATEGORY SCORING\n# =====================================================\n\ncategory_results = {}\n\nfor category, evaluations in categories.items():\n\n    total_score = 0.0\n    maximum_score = 0.0\n\n    evaluated_count = 0\n    not_applicable_count = 0\n\n    for evaluation in evaluations:\n\n        if evaluation.get(\n            \"decision\"\n        ) == \"NOT_APPLICABLE\":\n\n            not_applicable_count += 1\n            continue\n\n        priority = evaluation.get(\n            \"priority\",\n            \"required\"\n        )\n\n        priority_weight = PRIORITY_WEIGHTS.get(\n            priority,\n            1.0\n        )\n\n        score = get_requirement_score(\n            evaluation\n        )\n\n        total_score += score\n        maximum_score += priority_weight\n\n        evaluated_count += 1\n\n\n    if maximum_score > 0:\n\n        percentage = (\n            total_score /\n            maximum_score\n        ) * 100\n\n    else:\n\n        percentage = 0.0\n\n\n    category_results[category] = {\n\n        \"score\":\n            round(\n                total_score,\n                4\n            ),\n\n        \"maximum_score\":\n            round(\n                maximum_score,\n                4\n            ),\n\n        \"percentage\":\n            round(\n                percentage,\n                2\n            ),\n\n        \"evaluated_requirements\":\n            evaluated_count,\n\n        \"total_requirements\":\n            len(evaluations),\n\n        \"not_applicable\":\n            not_applicable_count\n    }\n\n\n# =====================================================\n# WEIGHTED ATS SCORE\n# =====================================================\n\nweighted_total = 0.0\nactive_category_weight = 0.0\n\nfor category, category_weight in CATEGORY_WEIGHTS.items():\n\n    result = category_results.get(\n        category\n    )\n\n    if not result:\n        continue\n\n    # Do not penalize the candidate if a category\n    # does not exist in the JD.\n    if result[\"evaluated_requirements\"] == 0:\n        continue\n\n    weighted_total += (\n        result[\"percentage\"] *\n        category_weight\n    )\n\n    active_category_weight += (\n        category_weight\n    )\n\n\nif active_category_weight > 0:\n\n    ats_score = (\n        weighted_total /\n        active_category_weight\n    )\n\nelse:\n\n    ats_score = 0.0\n\n\nats_score = round(\n    max(\n        0.0,\n        min(\n            ats_score,\n            100.0\n        )\n    ),\n    2\n)\n\n\n# =====================================================\n# REQUIREMENT LEVEL SCORES\n# =====================================================\n\nrequirement_scores = []\n\nfor evaluation in final_evaluations:\n\n    decision = evaluation.get(\n        \"decision\"\n    )\n\n    score = get_requirement_score(\n        evaluation\n    )\n\n    priority = evaluation.get(\n        \"priority\",\n        \"required\"\n    )\n\n    requirement_scores.append({\n\n        \"requirement_id\":\n            evaluation.get(\n                \"requirement_id\"\n            ),\n\n        \"text\":\n            evaluation.get(\n                \"text\"\n            ),\n\n        \"type\":\n            evaluation.get(\n                \"type\"\n            ),\n\n        \"priority\":\n            priority,\n\n        \"decision\":\n            decision,\n\n        \"confidence\":\n            evaluation.get(\n                \"confidence\"\n            ),\n\n        \"base_score\":\n            None\n            if decision == \"NOT_APPLICABLE\"\n            else DECISION_SCORES.get(\n                decision,\n                0.0\n            ),\n\n        \"priority_weight\":\n            None\n            if decision == \"NOT_APPLICABLE\"\n            else PRIORITY_WEIGHTS.get(\n                priority,\n                1.0\n            ),\n\n        \"weighted_score\":\n            None\n            if score is None\n            else round(\n                score,\n                4\n            ),\n\n        \"match_method\":\n            evaluation.get(\n                \"match_method\"\n            ),\n\n        \"evidence_ids\":\n            evaluation.get(\n                \"evidence_ids\",\n                []\n            )\n    })\n\n\n# =====================================================\n# DECISION COUNTS\n# =====================================================\n\ndecision_counts = {\n    \"EXACT\": 0,\n    \"STRONG_MATCH\": 0,\n    \"PARTIAL\": 0,\n    \"NO_MATCH\": 0,\n    \"INSUFFICIENT_EVIDENCE\": 0,\n    \"NOT_APPLICABLE\": 0\n}\n\nfor evaluation in final_evaluations:\n\n    decision = evaluation.get(\n        \"decision\"\n    )\n\n    if decision in decision_counts:\n\n        decision_counts[\n            decision\n        ] += 1\n\n\n# =====================================================\n# CONFIDENCE SUMMARY\n# =====================================================\n\nconfidence_values = []\n\nfor evaluation in final_evaluations:\n\n    if evaluation.get(\n        \"decision\"\n    ) == \"NOT_APPLICABLE\":\n\n        continue\n\n    confidence = evaluation.get(\n        \"confidence\"\n    )\n\n    if isinstance(\n        confidence,\n        (int, float)\n    ):\n\n        confidence_values.append(\n            confidence\n        )\n\n\nif confidence_values:\n\n    average_confidence = (\n        sum(confidence_values) /\n        len(confidence_values)\n    )\n\nelse:\n\n    average_confidence = 0.0\n\n\n# =====================================================\n# OUTPUT\n# =====================================================\n\nreturn [\n    {\n        \"json\": {\n\n            \"ats_score\":\n                ats_score,\n\n            \"score_version\":\n                \"v2\",\n\n            \"scoring_model\": {\n\n                \"decision_scores\":\n                    DECISION_SCORES,\n\n                \"priority_weights\":\n                    PRIORITY_WEIGHTS,\n\n                \"category_weights\":\n                    CATEGORY_WEIGHTS\n            },\n\n            \"category_scores\":\n                category_results,\n\n            \"decision_counts\":\n                decision_counts,\n\n            \"confidence_summary\": {\n\n                \"average_confidence\":\n                    round(\n                        average_confidence,\n                        4\n                    ),\n\n                \"evaluations_with_confidence\":\n                    len(\n                        confidence_values\n                    )\n            },\n\n            \"requirement_scores\":\n                requirement_scores\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        16
+      ],
+      "id": "6b774395-daaa-42f0-915b-45409c20bf6a",
+      "name": "Calculate ATS Score"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a production-grade ATS resume analysis engine.\n\nYour job is to convert the supplied ATS evaluation into a concise,\neasy-to-understand analysis for a resume dashboard.\n\nThe output will be displayed directly in a web frontend.\n\nThe user should be able to understand the result in less than 15 seconds.\n\nUse ONLY the supplied ATS score, requirement evaluations, JD requirements,\nand resume evidence.\n\nNEVER invent candidate experience.\n\nNEVER claim that the candidate has performed an activity unless the supplied\nevidence supports it.\n\nDo not recalculate the ATS score.\n\n==================================================\nOUTPUT PHILOSOPHY\n==================================================\n\nDo NOT produce a long report.\n\nDo NOT repeat every JD requirement.\n\nDo NOT explain every evaluation.\n\nSummarize the most important information.\n\nThe output should contain:\n\n1. Overall verdict\n2. Top strengths\n3. Top gaps\n4. Skill status\n5. Top 3 actions\n\n==================================================\nOVERALL VERDICT\n==================================================\n\nCreate a short one-sentence assessment.\n\nMaximum 20 words.\n\nExamples:\n\n\"Strong technical fit, but several product-specific responsibilities need\nstronger evidence.\"\n\n\"Excellent match across required skills with minor gaps in soft skills.\"\n\n\"Moderate fit with strong technical foundations but several required\ncapabilities are not demonstrated.\"\n\nAlso provide a short score label:\n\n90-100 → \"Excellent Match\"\n80-89 → \"Strong Match\"\n70-79 → \"Good Match\"\n60-69 → \"Moderate Match\"\nBelow 60 → \"Weak Match\"\n\n==================================================\nTOP STRENGTHS\n==================================================\n\nReturn exactly 2-3 strengths.\n\nPrioritize:\n\n1. High-scoring categories\n2. Required technical skills\n3. Strong matches\n4. Education\n\nEach strength must contain:\n\ntitle\nvalue\ndescription\n\nThe description must be one short sentence.\n\nMaximum 20 words per description.\n\n==================================================\nTOP GAPS\n==================================================\n\nReturn the 2-4 most important gaps.\n\nPrioritize:\n\n1. Required skills with weak evidence\n2. Required responsibilities\n3. Important evidence gaps\n4. Preferred requirements\n\nDo not include every weak requirement.\n\nCombine related requirements into one understandable gap.\n\nEach gap must contain:\n\ntitle\nseverity\ndescription\n\nAllowed severity:\n\nHIGH\nMEDIUM\nLOW\n\nMaximum 25 words per description.\n\n==================================================\nSKILL STATUS\n==================================================\n\nDivide skills into three groups:\n\nmatched\nneeds_evidence\nmissing\n\nMATCHED:\n\nSkills with EXACT or STRONG_MATCH.\n\nNEEDS_EVIDENCE:\n\nSkills with PARTIAL or INSUFFICIENT_EVIDENCE where related capability exists\nor the resume does not clearly demonstrate the capability.\n\nMISSING:\n\nOnly include genuinely absent required skills.\n\nDo NOT put a PARTIAL skill into missing.\n\nReturn a maximum of 8 items per group.\n\nUse short skill names rather than full JD sentences.\n\nSKILL CLASSIFICATION RULE\n\nThe \"skills\" object must contain ONLY technical or job-related skills.\n\nDo NOT include:\n- degrees\n- education\n- responsibilities\n- soft skills\n- job titles\n- companies\n\nEducation belongs only in the ATS/category scores.\n\nResponsibilities belong in top_gaps.\n\nSoft skills belong in top_gaps unless they are explicitly technical/job skills.\n\nFor \"matched\", include only skills with EXACT or STRONG_MATCH.\n\nFor \"needs_evidence\", include PARTIAL or INSUFFICIENT_EVIDENCE technical/job skills.\n\nFor \"missing\", include only genuinely missing technical/job skills.\n\n==================================================\nTOP ACTIONS\n==================================================\n\nReturn exactly 3 actions.\n\nThese are the three highest-impact things the candidate should do to\nimprove their resume for this JD.\n\nEach action must contain:\n\npriority\naction\ndescription\n\npriority must be:\n\n1\n2\n3\n\nDescriptions must be short and actionable.\n\nMaximum 25 words.\n\nIMPORTANT:\n\nNever tell the candidate to claim experience they do not have.\n\nIf the recommendation depends on experience that may exist but is not shown,\nuse wording such as:\n\n\"If applicable, explicitly mention...\"\n\n\"If you have this experience, add...\"\n\nIf a capability is genuinely missing, recommend gaining the capability or\nbuilding a project rather than pretending it exists.\n\n==================================================\nTRUTHFULNESS\n==================================================\n\nNever invent:\n\n- metrics\n- users\n- stakeholders\n- technologies\n- projects\n- outcomes\n- responsibilities\n- collaborations\n- education experience\n- product experience\n\nDo not convert a JD requirement into evidence of candidate experience.\n\n==================================================\nOUTPUT\n==================================================\n\nReturn ONLY valid JSON.\n\nReturn exactly:\n\n{\n  \"analysis\": {\n    \"ats_score\": 0,\n    \"verdict\": \"\",\n    \"score_label\": \"\",\n    \"top_strengths\": [\n      {\n        \"title\": \"\",\n        \"value\": \"\",\n        \"description\": \"\"\n      }\n    ],\n    \"top_gaps\": [\n      {\n        \"title\": \"\",\n        \"severity\": \"\",\n        \"description\": \"\"\n      }\n    ],\n    \"skills\": {\n      \"matched\": [],\n      \"needs_evidence\": [],\n      \"missing\": []\n    },\n    \"top_actions\": [\n      {\n        \"priority\": 1,\n        \"action\": \"\",\n        \"description\": \"\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "content": "=Analyze the following ATS evaluation:\n\n{{ JSON.stringify($json) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        2880,
+        160
+      ],
+      "id": "f5d9a243-fc04-4e6f-9839-33499e8f6162",
+      "name": "Resume Analysis",
+      "credentials": {
+        "openAiApi": {
+          "id": "rVMPcNWmxsYPgcr4",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "data = _items[0][\"json\"]\n\ntext = data[\"output\"][0][\"content\"][0][\"text\"]\n\ntext = text.strip()\n\nif text.startswith(\"```json\"):\n    text = text[7:]\n\nif text.startswith(\"```\"):\n    text = text[3:]\n\nif text.endswith(\"```\"):\n    text = text[:-3]\n\ntext = text.strip()\n\nimport json\n\ntry:\n    parsed = json.loads(text)\nexcept Exception as e:\n    raise Exception(\n        \"Failed to parse AI analysis JSON: \"\n        + str(e)\n    )\n\nif \"analysis\" not in parsed:\n    raise Exception(\n        \"AI output does not contain 'analysis'.\"\n    )\n\nanalysis = parsed[\"analysis\"]\n\nrequired_fields = [\n    \"ats_score\",\n    \"verdict\",\n    \"score_label\",\n    \"top_strengths\",\n    \"top_gaps\",\n    \"skills\",\n    \"top_actions\"\n]\n\nfor field in required_fields:\n\n    if field not in analysis:\n        raise Exception(\n            \"Missing field in AI analysis: \"\n            + field\n        )\n\nif not isinstance(\n    analysis[\"top_strengths\"],\n    list\n):\n    raise Exception(\n        \"top_strengths must be an array.\"\n    )\n\nif not isinstance(\n    analysis[\"top_gaps\"],\n    list\n):\n    raise Exception(\n        \"top_gaps must be an array.\"\n    )\n\nif not isinstance(\n    analysis[\"top_actions\"],\n    list\n):\n    raise Exception(\n        \"top_actions must be an array.\"\n    )\n\nif not isinstance(\n    analysis[\"skills\"],\n    dict\n):\n    raise Exception(\n        \"skills must be an object.\"\n    )\n\nfor field in [\n    \"matched\",\n    \"needs_evidence\",\n    \"missing\"\n]:\n\n    if field not in analysis[\"skills\"]:\n\n        raise Exception(\n            \"Missing skills field: \"\n            + field\n        )\n\nreturn [\n    {\n        \"json\": {\n            \"analysis\": analysis\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        160
+      ],
+      "id": "abf15178-578a-4c9a-92cf-db45b84ac16f",
+      "name": "Structure Analysis"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3280,
+        32
+      ],
+      "id": "64216304-dd8c-4f7c-8535-4b4422be00b2",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "items = _items\n\nscore_data = None\nanalysis_data = None\n\nfor item in items:\n    data = item.get(\"json\", {})\n\n    if \"ats_score\" in data and \"requirement_scores\" in data:\n        score_data = data\n\n    if \"analysis\" in data:\n        analysis_data = data[\"analysis\"]\n\nif score_data is None:\n    raise Exception(\"ATS score data not found.\")\n\nif analysis_data is None:\n    raise Exception(\"AI analysis data not found.\")\n\nreturn [\n    {\n        \"json\": {\n            \"success\": True,\n\n            \"analysis\": analysis_data,\n\n            \"score\": {\n                \"ats_score\": score_data.get(\"ats_score\"),\n                \"score_version\": score_data.get(\"score_version\"),\n                \"category_scores\": score_data.get(\n                    \"category_scores\",\n                    {}\n                ),\n                \"decision_counts\": score_data.get(\n                    \"decision_counts\",\n                    {}\n                ),\n                \"confidence_summary\": score_data.get(\n                    \"confidence_summary\",\n                    {}\n                )\n            },\n\n            \"requirements\": score_data.get(\n                \"requirement_scores\",\n                []\n            )\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3424,
+        32
+      ],
+      "id": "9b030dbb-3751-4d0d-a6a7-09f36b9344fb",
+      "name": "Structure API Response"
+    }
+  ],
+  "connections": {
+    "Extract Resume Data": {
+      "main": [
+        [
+          {
+            "node": "Resume Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Parser": {
+      "main": [
+        [
+          {
+            "node": "Structure Resume JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JD Parser": {
+      "main": [
+        [
+          {
+            "node": "Structure JD JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure JD JSON": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Structure Resume JSON": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Combine Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Items": {
+      "main": [
+        [
+          {
+            "node": "Evidence Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "JD Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evidence Builder": {
+      "main": [
+        [
+          {
+            "node": "Exact Matcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exact Matcher": {
+      "main": [
+        [
+          {
+            "node": "Prepare Embedding Input",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare Embedding Input": {
+      "main": [
+        [
+          {
+            "node": "Build Embedding Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Embedding Batch": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Vector Embedding",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenAI Vector Embedding": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Calculate Similarity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Similarity": {
+      "main": [
+        [
+          {
+            "node": "Prepare LLM Judge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare LLM Judge": {
+      "main": [
+        [
+          {
+            "node": "LLM Judge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Judge": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Judge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Judge": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Final Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Calculate ATS Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate ATS Score": {
+      "main": [
+        [
+          {
+            "node": "Resume Analysis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Analysis": {
+      "main": [
+        [
+          {
+            "node": "Structure Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Analysis": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "Structure API Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure API Response": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "27f02127-2842-4f6a-bb57-4ad7e6b14d23",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "609d5b8368084c14a68ed810c94c3b2b559839174f02ec5d9469ffbaf069ed41"
+  },
+  "nodeGroups": [],
+  "id": "zgNO9T8Bnl1ldIev",
+  "tags": []
+}

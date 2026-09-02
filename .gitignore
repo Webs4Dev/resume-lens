@@ -1,5 +1,23 @@
-node_modules/
-dist/
+# Environment variables
 .env
 .env.*
 !.env.example
+
+# Node
+node_modules/
+dist/
+
+# n8n runtime data
+n8n-data/
+n8n-runner/
+
+# n8n databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# OS
+.DS_Store
+
+# Logs
+*.log
