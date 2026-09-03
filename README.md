@@ -382,8 +382,8 @@ resume_ats_agent/
 │   ├── package.json
 │   └── vite.config.js
 │
-├──workflow/
-│  └── resume-ats-workflow.json
+├── workflow/
+│   └── resume-ats-workflow.json
 │
 ├── .gitignore
 └── README.md
@@ -410,8 +410,8 @@ For the complete AI workflow, you will also need the external services and API c
 Clone the repository:
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY>
-cd resume_ats_agent
+git clone https://github.com/Webs4Dev/resume-lens.git
+cd resume-lens
 ```
 
 Move into the frontend directory:
@@ -489,26 +489,6 @@ VITE_N8N_WEBHOOK_URL=https://your-n8n-instance/webhook/your-webhook-path
 
 ---
 
-# 🐳 n8n Docker Setup
-
-ResumeLens can run n8n using Docker.
-
-The backend architecture consists of:
-
-```text
-Docker
-│
-├── n8n
-│
-└── n8n Task Runner
-    ├── JavaScript Runner
-    └── Python Runner
-```
-
-The task runners provide the required execution environment for supported JavaScript and Python operations inside the workflow.
-
----
-
 # 📦 Sharing the Workflow
 
 The n8n workflow is available at:
@@ -581,10 +561,3 @@ If you find a bug, have a feature request, or want to improve the project:
 This project is licensed under the MIT License.
 
 ---
-
-## ⭐ ResumeLens
-
-ResumeLens combines traditional ATS concepts with modern **semantic search and evidence-grounded AI** to provide candidates with a more meaningful understanding of how their resume matches a job description.
-
-### Analyze → Understand → Improve → Apply
-```
