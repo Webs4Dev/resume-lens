@@ -1,0 +1,6 @@
+# Netlify builds only the static frontend; the FastAPI backend runs locally.
+# Redirects live in frontend/public/_redirects.
+[build]
+  base    = "frontend"
+  command = "npm run build"
+  publish = "dist"

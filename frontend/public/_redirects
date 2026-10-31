@@ -1,1 +1,3 @@
+# No backend is hosted yet: answer API calls with a 404 instead of the SPA page
+/api/*    /404    404
 /*    /index.html    200
