@@ -442,7 +442,7 @@ uvicorn backend.main:app --reload
 | Name | Required | Purpose |
 |---|---|---|
 | `N8N_WEBHOOK_URL` | yes | Production webhook URL of the ResumeLens n8n workflow |
-| `N8N_WEBHOOK_SECRET` | no | Shared secret sent as the `X-ResumeLens-Secret` header |
+| `N8N_WEBHOOK_SECRET` | yes | Shared secret sent as the `X-ResumeLens-Secret` header; must match the Header Auth credential on the n8n webhook |
 | `DB_PATH` | no | SQLite file, default `data/resumelens.db` |
 | `RESUME_DIR` | no | Folder for uploaded PDFs, default `data/resumes` |
 

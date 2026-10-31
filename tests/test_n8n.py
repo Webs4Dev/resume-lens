@@ -17,18 +17,30 @@ def test_returns_the_result(monkeypatch):
     monkeypatch.setattr(httpx, "post", fake_post(httpx.Response(200, json=SAMPLE_RESULT)))
     assert n8n.run_analysis(b"%PDF-", "cv.pdf", "jd") == SAMPLE_RESULT
 
-def test_sends_the_secret_header_when_set(monkeypatch):
+def test_sends_the_secret_header(monkeypatch):
     seen = {}
     monkeypatch.setattr(n8n, "N8N_WEBHOOK_SECRET", "s3cret")
     monkeypatch.setattr(httpx, "post", fake_post(httpx.Response(200, json=SAMPLE_RESULT), seen=seen))
     n8n.run_analysis(b"%PDF-", "cv.pdf", "jd")
     assert seen["headers"] == {n8n.SECRET_HEADER: "s3cret"}
 
-def test_not_configured(monkeypatch):
-    monkeypatch.setattr(n8n, "N8N_WEBHOOK_URL", None)
+@pytest.mark.parametrize("setting", ["N8N_WEBHOOK_URL", "N8N_WEBHOOK_SECRET"])
+def test_not_configured_never_calls_n8n(monkeypatch, setting):
+    calls = []
+    monkeypatch.setattr(n8n, setting, None)
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: calls.append(1))
     with pytest.raises(n8n.AnalysisError) as error:
         n8n.run_analysis(b"%PDF-", "cv.pdf", "jd")
     assert error.value.status_code == 503
+    assert calls == []
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_wrong_secret_is_a_generic_error(monkeypatch, status):
+    monkeypatch.setattr(httpx, "post", fake_post(httpx.Response(status, text="Authorization data is wrong!")))
+    with pytest.raises(n8n.AnalysisError) as error:
+        n8n.run_analysis(b"%PDF-", "cv.pdf", "jd")
+    assert error.value.status_code == 502
+    assert error.value.message == n8n.GENERIC_ERROR
 
 def test_error_body_is_not_passed_to_the_user(monkeypatch):
     body = "Error in node 'LLM Judge': internal stack trace"

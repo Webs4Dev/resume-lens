@@ -10,6 +10,7 @@ atexit.register(shutil.rmtree, TMP_DIR, ignore_errors=True)
 os.environ["DB_PATH"] = os.path.join(TMP_DIR, "test.db")
 os.environ["RESUME_DIR"] = os.path.join(TMP_DIR, "resumes")
 os.environ["N8N_WEBHOOK_URL"] = "http://n8n.test/webhook/resume"
+os.environ["N8N_WEBHOOK_SECRET"] = "test-secret"
 
 import pytest
 from fastapi.testclient import TestClient

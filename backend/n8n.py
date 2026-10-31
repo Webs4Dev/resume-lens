@@ -11,7 +11,7 @@ log = logging.getLogger("resumelens")
 # The webhook URL lives only here (backend .env), never in the frontend bundle,
 # so only logged-in users can trigger the paid LLM pipeline.
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
-# Optional shared secret sent as a header; the n8n webhook checks it (Phase 3).
+# Shared secret sent as a header; the n8n webhook's Header Auth rejects calls without it.
 N8N_WEBHOOK_SECRET = os.getenv("N8N_WEBHOOK_SECRET")
 SECRET_HEADER = "X-ResumeLens-Secret"
 
@@ -28,10 +28,11 @@ class AnalysisError(Exception):
 
 def run_analysis(pdf_bytes: bytes, filename: str, job_description: str) -> dict:
     """Send the resume and job description to the n8n workflow and return its result."""
-    if not N8N_WEBHOOK_URL:
+    if not N8N_WEBHOOK_URL or not N8N_WEBHOOK_SECRET:
+        log.error("Set N8N_WEBHOOK_URL and N8N_WEBHOOK_SECRET in .env, then restart the backend.")
         raise AnalysisError(503, "The analysis service is not configured.")
 
-    headers = {SECRET_HEADER: N8N_WEBHOOK_SECRET} if N8N_WEBHOOK_SECRET else {}
+    headers = {SECRET_HEADER: N8N_WEBHOOK_SECRET}
 
     try:
         response = httpx.post(
@@ -48,6 +49,10 @@ def run_analysis(pdf_bytes: bytes, filename: str, job_description: str) -> dict:
         raise AnalysisError(503, "Could not reach the analysis service. Is n8n running?")
 
     # n8n error bodies can expose workflow internals: log them, never return them.
+    if response.status_code in (401, 403):
+        log.error("n8n rejected the webhook secret: N8N_WEBHOOK_SECRET must match the Header Auth credential.")
+        raise AnalysisError(502, GENERIC_ERROR)
+
     if response.status_code >= 400:
         log.error("n8n returned %s: %s", response.status_code, response.text[:200])
         raise AnalysisError(502, GENERIC_ERROR)
