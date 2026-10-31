@@ -1,454 +1,175 @@
-# ResumeLens 🚀
+# ResumeLens
 
-### AI-Powered Resume ATS Analyzer
+**Evidence-grounded resume analysis against a specific job description.**
 
-ResumeLens is an AI-powered Applicant Tracking System (ATS) analyzer that evaluates how well a candidate's resume matches a given job description.
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![n8n](https://img.shields.io/badge/n8n-workflow-EA4B71?logo=n8n&logoColor=white)](https://n8n.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Unlike traditional ATS systems that primarily depend on keyword matching, ResumeLens combines **structured resume parsing, semantic embeddings, evidence-grounded LLM evaluation, deterministic scoring, and AI-powered recommendations** to provide a deeper analysis of resume-job compatibility.
-
-The application allows users to upload their resume, provide a job description, and receive an ATS score along with matched skills, gaps, strengths, and actionable recommendations.
-
----
-
-## ✨ Features
-
-- 📄 **Resume Parsing**
-  - Extracts structured information from resumes.
-  - Identifies education, experience, projects, skills, certifications, achievements, and more.
-
-- 💼 **Job Description Analysis**
-  - Extracts requirements from job descriptions.
-  - Identifies required skills, responsibilities, education requirements, and soft skills.
-
-- 🧠 **Semantic Matching**
-  - Uses vector embeddings to compare resume evidence with job requirements.
-  - Goes beyond exact keyword matching.
-
-- 🤖 **Evidence-Grounded AI Evaluation**
-  - Uses an LLM to evaluate whether the resume provides actual evidence for each requirement.
-  - Prevents the system from assuming skills that are not demonstrated in the resume.
-
-- 📊 **ATS Score**
-  - Generates an overall resume-job compatibility score.
-  - Provides category-level insights into the candidate's performance.
-
-- 🔍 **Gap Analysis**
-  - Identifies requirements that are missing, partially satisfied, or lack sufficient evidence.
-
-- 💡 **AI Recommendations**
-  - Provides actionable suggestions to improve the resume.
-  - Highlights where stronger evidence can be added when applicable.
-
-- 🎯 **Frontend Dashboard**
-  - Displays ATS score, strengths, gaps, matched skills, and recommended actions in an easy-to-understand interface.
+ResumeLens scores how well a resume matches a job description and shows *why*. Most ATS
+checkers count keywords. ResumeLens splits the job description into individual requirements,
+looks for concrete evidence of each one in the resume, and scores the result with a fixed,
+transparent formula. Every verdict links back to the resume lines that support it.
 
 ---
 
-# 🏗️ Architecture
+## Contents
 
-ResumeLens consists of a React frontend connected to an n8n-based AI processing pipeline.
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Scoring model](#scoring-model)
+- [Tech stack](#tech-stack)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [Security and privacy](#security-and-privacy)
+- [Limitations](#limitations)
+- [License](#license)
 
-```text
-                         ┌──────────────────────┐
-                         │        User          │
-                         │ Resume + Job         │
-                         │ Description          │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │   React Frontend     │
-                         │       Vite           │
-                         └──────────┬───────────┘
-                                    │
-                                    │ HTTPS Webhook
-                                    ▼
-                         ┌──────────────────────┐
-                         │        n8n           │
-                         │   ATS Workflow       │
-                         └──────────┬───────────┘
-                                    │
-                    ┌───────────────┼───────────────┐
-                    │               │               │
-                    ▼               ▼               ▼
-             Resume Parsing    JD Parsing      Embeddings
-                    │               │               │
-                    └───────────────┼───────────────┘
-                                    ▼
-                         ┌──────────────────────┐
-                         │      LLM Judge       │
-                         │ Evidence-Grounded    │
-                         │ Requirement Matching │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │ Deterministic ATS    │
-                         │  Score Calculation   │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │   AI Gap Analysis    │
-                         │ & Recommendations    │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │   Structured JSON    │
-                         │      Response        │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │   React Dashboard    │
-                         │ Score + Insights     │
-                         └──────────────────────┘
+---
+
+## Features
+
+- **Requirement-level matching.** Each skill, responsibility, education requirement and soft
+  skill in the job description is evaluated on its own, with a decision, a confidence score
+  and a short explanation.
+- **Evidence you can check.** Every positive decision cites the exact resume lines it is based
+  on (project bullets, skills, certifications), shown under each requirement.
+- **Semantic matching.** Embeddings and an LLM judge recognize transferable experience (for
+  example, a RAG project counting towards "build retrieval pipelines") instead of exact
+  keyword matches only.
+- **Deterministic score.** The LLM classifies requirements; the score itself comes from fixed
+  weights in code, so the same evaluations always produce the same number.
+- **Degree-aware education matching.** Recognizes common degrees and levels (B.Tech, B.E.,
+  B.Sc, BCA, M.Tech, MCA, MBA, PhD, "Bachelor's", "Master's"), treats a higher degree as
+  meeting a lower requirement, and handles "B.Tech, M.Tech or MCA" style alternatives.
+- **Actionable summary.** Top strengths, highest-impact gaps, skill status (matched / needs
+  evidence / missing) and three prioritized actions.
+- **Accounts and history.** Email and password accounts. Every analysis is saved with its
+  resume PDF and job description, can be reopened, re-downloaded or deleted, and feeds a
+  score-over-time chart.
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+    U[Browser<br/>React + Vite] -->|/api via Vite proxy| B[FastAPI backend]
+    B -->|PDF + job description<br/>X-ResumeLens-Secret| W[n8n workflow]
+    B --- D[(SQLite<br/>+ resume PDFs)]
+    W --> O[OpenAI<br/>gpt-4.1-mini<br/>text-embedding-3-small]
 ```
 
----
+The browser only talks to the local FastAPI backend. The backend checks the user's session,
+calls the n8n workflow with a shared secret, saves the result, and returns it. The webhook
+URL never appears in frontend code.
 
-# 🔄 How It Works
+The n8n workflow runs this pipeline for each analysis:
 
-## 1. Resume Upload
-
-The user uploads their resume through the frontend.
-
-The resume is parsed into structured information such as:
-
-```text
-Personal Information
-Education
-Experience
-Projects
-Skills
-Certifications
-Achievements
-Extracurricular Activities
-Publications
-```
-
-This structured data is converted into individual pieces of **resume evidence**.
+1. **Parse.** The resume PDF is converted to text and parsed into structured JSON (education,
+   experience, projects, skills, certifications, activities). The job description is parsed
+   into requirements tagged as *required* or *preferred*.
+2. **Build evidence.** Every resume fact becomes an evidence item with an ID, and every job
+   requirement becomes a requirement item with an ID.
+3. **Exact match.** Technical skills that appear verbatim in the resume are matched directly.
+4. **Retrieve.** Remaining requirements and all evidence are embedded, and the three most
+   similar evidence items are retrieved for each requirement by cosine similarity.
+5. **Judge.** An LLM evaluates each requirement against its retrieved evidence and returns a
+   decision, a confidence and a comment. It may only cite evidence IDs it was given.
+6. **Score.** Decisions are converted into category and overall scores with fixed weights (see
+   below). Education is matched by rule, not by the LLM.
+7. **Summarize.** A second LLM call turns the scored evaluation into a short verdict,
+   strengths, gaps and actions, using only the evidence provided.
 
 ---
 
-## 2. Job Description Processing
+## Scoring model
 
-The job description is analyzed and converted into structured requirements.
+Each requirement receives one decision:
 
-Requirements can include:
+| Decision | Meaning | Points |
+|---|---|---|
+| `EXACT` | The resume directly demonstrates the requirement | 1.00 |
+| `STRONG_MATCH` | The underlying capability is clearly shown, in different words or context | 0.85 |
+| `PARTIAL` | Related capability is shown, but important parts are missing | 0.50 |
+| `NO_MATCH` | The evidence is unrelated | 0.00 |
+| `INSUFFICIENT_EVIDENCE` | Not enough evidence to judge | 0.00 |
+| `NOT_APPLICABLE` | Excluded from scoring (for example, an unmet alternative degree) | — |
 
-```text
-Education
-Technical Skills
-Responsibilities
-Soft Skills
-Experience
-Other Requirements
-```
+Points are weighted by priority (required = 1.0, preferred = 0.5) and averaged within each
+category. The overall score is a weighted mean of the categories:
 
-Each requirement is assigned an identifier so it can be evaluated independently.
-
----
-
-## 3. Resume Evidence
-
-Resume information is divided into individual evidence items.
-
-For example:
-
-```text
-Type: Project
-Evidence ID: project_3
-
-Built a multi-agent research platform using
-RAG and semantic search.
-```
-
-This allows the system to determine exactly which part of the resume supports a job requirement.
-
----
-
-## 4. Semantic Embeddings
-
-Resume evidence and job requirements are converted into vector embeddings.
-
-ResumeLens uses semantic similarity to identify related concepts even when the wording is different.
-
-For example:
-
-```text
-Resume:
-Developed retrieval-augmented generation pipelines.
-
-Job Requirement:
-Experience building RAG systems.
-```
-
-These can be recognized as semantically related even though the exact wording differs.
-
----
-
-## 5. LLM Requirement Evaluation
-
-The LLM evaluates every job requirement against the available resume evidence.
-
-Each requirement receives one of the following decisions:
-
-| Decision | Meaning |
+| Category | Weight |
 |---|---|
-| `EXACT` | The resume directly satisfies the requirement |
-| `STRONG_MATCH` | Strong relevant evidence exists |
-| `PARTIAL` | Some relevant evidence exists, but it is incomplete |
-| `NO_MATCH` | The resume does not satisfy the requirement |
-| `INSUFFICIENT_EVIDENCE` | There is not enough evidence to determine a match |
+| Technical skills | 40% |
+| Responsibilities | 40% |
+| Education | 10% |
+| Soft skills | 10% |
 
-The evaluator is designed to be **evidence-grounded**, meaning positive matches should be supported by actual resume evidence rather than assumptions.
-
----
-
-## 6. ATS Score Calculation
-
-After evaluating individual requirements, ResumeLens calculates an overall ATS compatibility score.
-
-The system also evaluates different requirement categories to explain the score.
-
-For example:
-
-```text
-Overall ATS Score: 76.5%
-
-Technical Skills:     Strong
-Education:            Strong
-Responsibilities:     Moderate
-Soft Skills:          Needs Evidence
-```
+A category the job description does not mention is left out, and the remaining weights are
+rescaled, so candidates are not penalized for requirements that do not exist.
 
 ---
 
-## 7. Gap Analysis
+## Tech stack
 
-The system identifies the most important gaps in the resume.
-
-Example:
-
-```text
-Requirement:
-Experience with LangChain
-
-Gap:
-LangChain experience is not clearly demonstrated.
-
-Severity:
-Medium
-
-Recommendation:
-Highlight an existing project involving LangChain,
-if applicable.
-```
-
-Recommendations are based on the candidate's existing evidence and should not encourage adding false skills or experience.
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, React Router, plain CSS with design tokens |
+| Backend | Python 3.12, FastAPI, SQLite (standard library), httpx |
+| Workflow | n8n (Python Code nodes, OpenAI nodes, webhook with Header Auth) |
+| AI | OpenAI `gpt-4.1-mini` (parsing, judging, summary), `text-embedding-3-small` |
+| Testing | pytest, ESLint |
 
 ---
 
-## 8. Final AI Analysis
+## Getting started
 
-The final results are converted into a frontend-friendly structure containing information such as:
+### Prerequisites
 
-```text
-ATS Score
-Verdict
-Score Label
-Top Strengths
-Top Gaps
-Matched Skills
-Skills Needing Evidence
-Missing Skills
-Recommended Actions
-```
+- Python 3.12 or newer
+- Node.js 20.19+ or 22.12+, with npm
+- A self-hosted [n8n](https://docs.n8n.io/hosting/) instance (Docker works well) with the
+  **Python task runner** enabled. The workflow's Python nodes import `json` and `math`, so
+  those standard-library modules must be allowlisted for the runner (see n8n's task runner
+  documentation).
+- An OpenAI API key
 
-This allows the frontend to present the analysis without needing to understand the internal AI workflow.
+### 1. Set up the n8n workflow
 
----
+1. In n8n, import [`workflow/resume_ats_workflow.json`](workflow/resume_ats_workflow.json).
+2. Create an **OpenAI** credential with your API key and select it on the OpenAI nodes and the
+   *OpenAI Vector Embedding* node.
+3. Generate a webhook secret:
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+4. Create a **Header Auth** credential with name `X-ResumeLens-Secret` and the secret as its
+   value, and select it on the **Request** webhook node.
+5. Activate the workflow and copy the webhook's **production** URL.
 
-# 🧠 AI Pipeline
-
-The complete processing pipeline can be summarized as:
-
-```text
-Resume
-   │
-   ▼
-Resume Parser
-   │
-   ▼
-Structured Resume
-   │
-   ▼
-Resume Evidence
-   │
-   ▼
-Embeddings
-   │
-   ├─────────────────────────────┐
-   │                             │
-   │                      Job Description
-   │                             │
-   │                             ▼
-   │                         JD Parser
-   │                             │
-   │                             ▼
-   │                      Job Requirements
-   │                             │
-   │                             ▼
-   └──────────────►          Embeddings
-                             │
-                             ▼
-                       LLM Evaluation
-                             │
-                             ▼
-                    Requirement Results
-                             │
-                             ▼
-                    ATS Score Calculation
-                             │
-                             ▼
-                       Gap Analysis
-                             │
-                             ▼
-                    AI Recommendations
-                             │
-                             ▼
-                    Structured JSON
-                             │
-                             ▼
-                     React Dashboard
-```
-
----
-
-# 🛠️ Tech Stack
-
-### Frontend
-
-- React
-- Vite
-- JavaScript
-- HTML
-- CSS
-- React Router
-
-### AI / NLP
-
-- Large Language Models
-- OpenAI Embeddings
-- Semantic Similarity
-- Evidence-Grounded LLM Evaluation
-
-### Backend
-
-- Python + FastAPI (accounts, history, file storage)
-- SQLite (users, sessions, analyses)
-- Local folder for uploaded resume PDFs
-
-### Workflow
-
-- n8n
-- n8n Webhooks
-- n8n Code Nodes
-- n8n AI Nodes
-
-### Infrastructure
-
-- Docker (n8n + task runners)
-- n8n Task Runners
-
----
-
-# 📁 Project Structure
-
-```text
-resume-ats-agent/
-│
-├── backend/               FastAPI API: auth, history, calls the n8n webhook
-│   ├── routes/
-│   ├── auth.py
-│   ├── db.py
-│   ├── n8n.py
-│   └── main.py
-├── tests/                 pytest suite (n8n is faked; no API credits spent)
-├── frontend/
-│   ├── src/
-│   │   ├── auth/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   └── services/
-│   ├── package.json
-│   └── vite.config.js     proxies /api to the backend
-├── workflow/
-│   └── resume_ats_workflow.json
-├── data/                  created at runtime: SQLite DB + resumes (gitignored)
-├── .env.example
-├── requirements.txt
-└── README.md
-```
-
----
-
-# 🚀 Getting Started
-
-## Prerequisites
-
-- Python 3.12+
-- Node.js and npm
-- n8n (Docker), with the ResumeLens workflow imported and active
-
-For the complete AI workflow, you will also need the external services and API credentials required by the imported n8n workflow.
-
-ResumeLens runs fully on your machine. The browser only talks to the local
-FastAPI backend; the backend is the only thing that calls the n8n webhook, so
-the webhook URL never appears in the frontend code.
-
-```text
-Browser ──/api──▶ Vite dev proxy ──▶ FastAPI (localhost:8000) ──▶ n8n webhook
-                                         │
-                                         └─ data/resumelens.db + data/resumes/
-```
-
----
-
-# 💻 Running Locally
-
-Clone the repository:
+### 2. Run the backend
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY>
-cd resume-ats-agent
-```
+git clone https://github.com/Webs4Dev/ResumeLens.git
+cd ResumeLens
 
-## 1. Backend
-
-```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # then fill in N8N_WEBHOOK_URL
+
+cp .env.example .env    # set N8N_WEBHOOK_URL and N8N_WEBHOOK_SECRET
 uvicorn backend.main:app --reload
 ```
 
-### Environment variables (`.env` in the project root)
+The API runs on `http://localhost:8000`. The SQLite database and uploaded resumes are created
+in `data/` on first start.
 
-| Name | Required | Purpose |
-|---|---|---|
-| `N8N_WEBHOOK_URL` | yes | Production webhook URL of the ResumeLens n8n workflow |
-| `N8N_WEBHOOK_SECRET` | yes | Shared secret sent as the `X-ResumeLens-Secret` header; must match the Header Auth credential on the n8n webhook |
-| `DB_PATH` | no | SQLite file, default `data/resumelens.db` |
-| `RESUME_DIR` | no | Folder for uploaded PDFs, default `data/resumes` |
-
-> Do not commit `.env` to GitHub. The frontend needs no environment variables.
-
-## 2. Frontend
+### 3. Run the frontend
 
 ```bash
 cd frontend
@@ -456,137 +177,97 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, create an account, and run your first analysis.
-Every analysis is saved to your History, where you can reopen it, download
-the resume you uploaded, or delete it.
+Open `http://localhost:5173`, create an account, and upload a resume (PDF, up to 5 MB) with a
+job description of at least 100 characters. An analysis typically takes 30 to 60 seconds.
 
-## Tests
+---
+
+## Configuration
+
+The backend reads these variables from `.env` in the project root. The frontend needs none.
+
+| Variable | Required | Description |
+|---|---|---|
+| `N8N_WEBHOOK_URL` | Yes | Production webhook URL of the ResumeLens workflow |
+| `N8N_WEBHOOK_SECRET` | Yes | Shared secret sent as `X-ResumeLens-Secret`; must match the n8n Header Auth credential |
+| `DB_PATH` | No | SQLite file. Default: `data/resumelens.db` |
+| `RESUME_DIR` | No | Folder for uploaded PDFs. Default: `data/resumes` |
+
+---
+
+## Testing
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
-cd frontend && npm run lint && npm run build
+pytest                                  # backend: auth, history, uploads, n8n client
+
+cd frontend
+npm run lint
+npm run build
 ```
+
+The backend tests replace n8n with a fake, so they run offline and never call OpenAI. They
+cover registration and login, session and CSRF handling, per-user access to analyses and
+files, upload validation, and how n8n errors and timeouts are reported.
 
 ---
 
-# ⚙️ Setting Up the n8n Workflow
-
-The repository contains the exported ResumeLens n8n workflow:
+## Project structure
 
 ```text
-workflow/resume_ats_workflow.json
+.
+├── backend/                 FastAPI application
+│   ├── main.py              App setup, CSRF, upload-size and trusted-host middleware
+│   ├── auth.py              Password hashing, sessions, current-user dependency
+│   ├── db.py                SQLite schema and connections
+│   ├── n8n.py               Webhook client (secret header, timeouts, error mapping)
+│   └── routes/              /api/v1/auth and /api/v1/analyses
+├── frontend/                React + Vite single-page app
+│   └── src/
+│       ├── auth/            Session context and auth error messages
+│       ├── components/      UI components (score ring, trend chart, cards)
+│       ├── hooks/           Data loading for saved analyses
+│       ├── pages/           Home, Login, Sign up, Analyze, History, Results, Details
+│       └── services/        API client
+├── tests/                   pytest suite
+├── workflow/                n8n workflow export
+├── .env.example             Backend configuration template
+├── requirements.txt         Backend dependencies
+└── requirements-dev.txt     Test dependencies
 ```
 
-## Importing the Workflow
+---
 
-1. Start your n8n instance.
-2. Open the n8n editor.
-3. Import `resume_ats_workflow.json`.
-4. Configure the required credentials.
-5. Verify the webhook configuration.
-6. Activate the workflow.
-7. Copy the production webhook URL.
-8. Put it in the backend `.env` as `N8N_WEBHOOK_URL`.
+## Security and privacy
+
+ResumeLens is designed to run locally. Resumes and results stay on your machine, except for
+the text sent to OpenAI by the n8n workflow during an analysis.
+
+- Passwords are hashed with scrypt; only a SHA-256 hash of each session token is stored.
+- Sessions use an `HttpOnly`, `SameSite=Lax` cookie. Every state-changing request must carry a
+  custom header, which blocks cross-site request forgery.
+- Every analysis and resume file is scoped to its owner; requests for another user's data
+  return 404.
+- Uploaded files are checked for a PDF signature, limited to 5 MB (oversized requests are
+  refused before the body is read), and stored under random names.
+- The API only answers requests addressed to `localhost`, which blocks DNS-rebinding attacks.
+- The n8n webhook rejects calls without the shared secret, and raw workflow errors are never
+  shown to users.
+
+The current setup is not hardened for public deployment. Before exposing it to the internet,
+add HTTPS with secure cookies, rate limiting on login and analysis, and a production database.
 
 ---
 
-# 🐳 n8n Docker Setup
+## Limitations
 
-ResumeLens can run n8n using Docker.
-
-The backend architecture consists of:
-
-```text
-Docker
-│
-├── n8n
-│
-└── n8n Task Runner
-    ├── JavaScript Runner
-    └── Python Runner
-```
-
-The task runners provide the required execution environment for supported JavaScript and Python operations inside the workflow.
+- Only PDFs with a text layer are supported; scanned resumes need OCR first.
+- Prompts and degree matching are tuned for English and for Indian and US degree names.
+- LLM decisions can vary slightly between runs on the same input; the scoring formula itself
+  is deterministic.
 
 ---
 
-# 📦 Sharing the Workflow
+## License
 
-The n8n workflow is available at:
-
-```text
-workflow/resume_ats_workflow.json
-```
-
-A new user can:
-
-1. Clone the repository.
-2. Set up an n8n instance.
-3. Import the workflow.
-4. Configure their own API credentials.
-5. Configure the webhook.
-6. Put the webhook URL in the backend `.env` as `N8N_WEBHOOK_URL`.
-7. Start the backend and the frontend.
-
-This allows the project to be reproduced without sharing private credentials or n8n runtime data.
-
----
-
-# ⚠️ Important
-
-The GitHub repository contains the **source code and workflow definition**.
-
-It does not automatically provide:
-
-- A running n8n server
-- API credentials
-- LLM API access
-- n8n database
-- Task runner environment
-- Private environment variables
-
-Anyone cloning the project needs to configure these components.
-
----
-
-# 🎯 Use Cases
-
-ResumeLens can be useful for:
-
-- Students applying for internships
-- Developers applying for software engineering roles
-- AI/ML candidates
-- Job seekers optimizing resumes
-- Career development platforms
-- Recruiters and hiring teams
-- Resume analysis applications
-
----
-
-# 🤝 Contributing
-
-Contributions are welcome.
-
-If you find a bug, have a feature request, or want to improve the project:
-
-1. Fork the repository.
-2. Create a new branch.
-3. Make your changes.
-4. Commit your changes.
-5. Open a Pull Request.
-
----
-
-# 📄 License
-
-This project is licensed under the MIT License.
-
----
-
-## ⭐ ResumeLens
-
-ResumeLens combines traditional ATS concepts with modern **semantic search and evidence-grounded AI** to provide candidates with a more meaningful understanding of how their resume matches a job description.
-
-### Analyze → Understand → Improve → Apply
-```
+Released under the [MIT License](LICENSE).

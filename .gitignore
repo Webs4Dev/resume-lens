@@ -29,8 +29,8 @@ venv/
 __pycache__/
 .pytest_cache/
 
-# Claude Code per-machine settings
-.claude/settings.local.json
+# Claude Code project settings (local only)
+.claude/
 *.db
 *.db-wal
 *.db-shm
