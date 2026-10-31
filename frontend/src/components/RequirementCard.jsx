@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 export default function RequirementCard({
@@ -6,6 +6,8 @@ export default function RequirementCard({
 }) {
     const [open, setOpen] =
         useState(false);
+
+    const bodyId = useId();
 
     const decision =
         requirement.decision || "";
@@ -15,18 +17,31 @@ export default function RequirementCard({
             .toLowerCase()
             .replaceAll(" ", "_");
 
+    // `evidence` (id + resume text) is used when the workflow sends
+    // it; older responses only have `evidence_ids`.
+    const evidence =
+        Array.isArray(requirement.evidence)
+            ? requirement.evidence
+            : [];
+
+    const evidenceIds =
+        requirement.evidence_ids || [];
+
     return (
         <div className="card detail-card">
 
-            <div className="detail-header">
-
-                <button
-                    onClick={() =>
-                        setOpen(!open)
-                    }
-                >
+            <button
+                type="button"
+                className="detail-header"
+                aria-expanded={open}
+                aria-controls={bodyId}
+                onClick={() =>
+                    setOpen(!open)
+                }
+            >
+                <span className="detail-title">
                     {requirement.text}
-                </button>
+                </span>
 
                 <span
                     className={`decision decision-${decisionClass}`}
@@ -39,6 +54,7 @@ export default function RequirementCard({
 
                 <ChevronDown
                     size={18}
+                    aria-hidden="true"
                     style={{
                         transform: open
                             ? "rotate(180deg)"
@@ -46,11 +62,10 @@ export default function RequirementCard({
                         transition: "0.2s"
                     }}
                 />
-
-            </div>
+            </button>
 
             {open && (
-                <div className="detail-body">
+                <div className="detail-body" id={bodyId}>
 
                     <div className="detail-meta">
 
@@ -81,15 +96,33 @@ export default function RequirementCard({
                         </p>
                     )}
 
-                    {requirement.evidence_ids?.length > 0 && (
+                    {evidence.length > 0 ? (
                         <div className="evidence">
 
                             <strong>
-                                Evidence
+                                Evidence from your resume
+                            </strong>
+
+                            <ul className="evidence-list">
+                                {evidence.map(
+                                    (item) => (
+                                        <li key={item.id}>
+                                            {item.text}
+                                        </li>
+                                    )
+                                )}
+                            </ul>
+
+                        </div>
+                    ) : evidenceIds.length > 0 && (
+                        <div className="evidence">
+
+                            <strong>
+                                Evidence references
                             </strong>
 
                             <div>
-                                {requirement.evidence_ids.map(
+                                {evidenceIds.map(
                                     (id) => (
                                         <span
                                             className="evidence-id"

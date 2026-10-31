@@ -1,34 +1,20 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import RequirementCard from "../components/RequirementCard";
+import { readStoredResult } from "../services/resultStorage";
 
 export default function DetailedAnalysis() {
-    const navigate = useNavigate();
-    const [result, setResult] = useState(null);
-
-    useEffect(() => {
-        const stored =
-            sessionStorage.getItem(
-                "resumeLensResult"
-            );
-
-        if (!stored) {
-            navigate("/analyze");
-            return;
-        }
-
-        setResult(
-            JSON.parse(stored)
-        );
-    }, [navigate]);
+    const [result] = useState(readStoredResult);
 
     if (!result) {
-        return null;
+        return <Navigate to="/analyze" replace />;
     }
 
     const requirements =
-        result.requirements || [];
+        Array.isArray(result.requirements)
+            ? result.requirements
+            : [];
 
     return (
         <div className="app">
@@ -56,11 +42,19 @@ export default function DetailedAnalysis() {
                     </p>
 
                     <div>
+                        {requirements.length === 0 && (
+                            <p className="card-description">
+                                No requirement details were returned
+                                for this analysis.
+                            </p>
+                        )}
+
                         {requirements.map(
-                            (requirement) => (
+                            (requirement, index) => (
                                 <RequirementCard
                                     key={
-                                        requirement.requirement_id
+                                        requirement.requirement_id ??
+                                        index
                                     }
                                     requirement={
                                         requirement

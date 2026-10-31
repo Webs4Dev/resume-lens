@@ -27,10 +27,17 @@ export default function CategoryScores({
 
             {categories.map((category) => {
 
+                const data =
+                    categoryScores?.[category.key];
+
+                // The scorer skips categories the JD never mentions,
+                // so show N/A rather than a misleading red 0%.
+                const notScored =
+                    !data ||
+                    !data.evaluated_requirements;
+
                 const percentage =
-                    categoryScores?.[
-                        category.key
-                    ]?.percentage ?? 0;
+                    data?.percentage ?? 0;
 
                 const color =
                     percentage >= 80
@@ -46,20 +53,28 @@ export default function CategoryScores({
                         </div>
 
                         <div className="category-value">
-                            {percentage}%
+                            {notScored
+                                ? "N/A"
+                                : `${Math.round(percentage)}%`}
                         </div>
 
-                        <div className="progress">
-                            <div
-                                className={`progress-bar ${color}`}
-                                style={{
-                                    width: `${Math.min(
-                                        percentage,
-                                        100
-                                    )}%`
-                                }}
-                            />
-                        </div>
+                        {notScored ? (
+                            <p className="card-description category-note">
+                                Not in this job description
+                            </p>
+                        ) : (
+                            <div className="progress">
+                                <div
+                                    className={`progress-bar ${color}`}
+                                    style={{
+                                        width: `${Math.min(
+                                            percentage,
+                                            100
+                                        )}%`
+                                    }}
+                                />
+                            </div>
+                        )}
                     </TiltCard>
                 );
             })}

@@ -1,41 +1,37 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import CategoryScores from "../components/CategoryScores";
 import StrengthCard from "../components/StrengthCard";
 import GapCard from "../components/GapCard";
 import ScoreRing from "../components/ScoreRing";
 import TiltCard from "../components/TiltCard";
+import { readStoredResult } from "../services/resultStorage";
+
+const DECISION_LABELS = {
+    EXACT: "Exact",
+    STRONG_MATCH: "Strong match",
+    PARTIAL: "Partial",
+    NO_MATCH: "No match",
+    INSUFFICIENT_EVIDENCE: "Insufficient evidence",
+    NOT_APPLICABLE: "Not applicable"
+};
 
 export default function Results() {
-    const navigate = useNavigate();
-    const [result, setResult] = useState(null);
-
-    useEffect(() => {
-        const stored =
-            sessionStorage.getItem(
-                "resumeLensResult"
-            );
-
-        if (!stored) {
-            navigate("/analyze");
-            return;
-        }
-
-        setResult(
-            JSON.parse(stored)
-        );
-    }, [navigate]);
+    const [result] = useState(readStoredResult);
 
     if (!result) {
-        return null;
+        return <Navigate to="/analyze" replace />;
     }
 
     const analysis =
         result.analysis;
 
     const score =
-        result.score;
+        result.score || {};
+
+    const atsScore =
+        analysis.ats_score ?? score.ats_score ?? 0;
 
     return (
         <div className="app">
@@ -47,7 +43,7 @@ export default function Results() {
 
                     <div className="result-hero animate-in">
 
-                        <ScoreRing score={analysis.ats_score} />
+                        <ScoreRing score={atsScore} />
 
                         <div className="result-hero-text">
 
@@ -80,6 +76,15 @@ export default function Results() {
                         <CategoryScores
                             categoryScores={
                                 score.category_scores
+                            }
+                        />
+
+                        <DecisionSummary
+                            decisionCounts={
+                                score.decision_counts
+                            }
+                            confidenceSummary={
+                                score.confidence_summary
                             }
                         />
                     </section>
@@ -182,8 +187,8 @@ export default function Results() {
                         }}>
 
                             {analysis.top_actions?.map(
-                                (action) => (
-                                    <TiltCard key={action.priority}>
+                                (action, index) => (
+                                    <TiltCard key={action.priority ?? index}>
                                         <div className="action-card">
                                             <div className="action-number">
                                                 {action.priority}
@@ -223,6 +228,61 @@ export default function Results() {
                 </div>
 
             </main>
+        </div>
+    );
+}
+
+// How many requirements landed in each decision bucket, plus the
+// judge's average confidence, so the score is not a black box.
+function DecisionSummary({
+    decisionCounts,
+    confidenceSummary
+}) {
+    if (!decisionCounts) {
+        return null;
+    }
+
+    const entries = Object.entries(decisionCounts)
+        .filter(([, count]) => count > 0);
+
+    if (entries.length === 0) {
+        return null;
+    }
+
+    const total = entries.reduce(
+        (sum, [, count]) => sum + count,
+        0
+    );
+
+    const averageConfidence =
+        confidenceSummary?.average_confidence;
+
+    return (
+        <div className="decision-summary">
+
+            <p className="card-description">
+                {total} requirements evaluated
+                {typeof averageConfidence === "number" && (
+                    <>
+                        {" · "}average confidence{" "}
+                        {Math.round(averageConfidence * 100)}%
+                    </>
+                )}
+            </p>
+
+            <div className="detail-meta">
+                {entries.map(([decision, count]) => (
+                    <span
+                        key={decision}
+                        className={`decision decision-${decision.toLowerCase()}`}
+                    >
+                        {DECISION_LABELS[decision] ||
+                            decision.replaceAll("_", " ")}
+                        : {count}
+                    </span>
+                ))}
+            </div>
+
         </div>
     );
 }
