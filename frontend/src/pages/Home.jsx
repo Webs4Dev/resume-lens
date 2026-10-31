@@ -1,10 +1,18 @@
 import { ArrowRight, FileText, Brain, Target } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import ApertureMark from "../components/ApertureMark";
 import TiltCard from "../components/TiltCard";
+import { useAuth } from "../auth/AuthContext";
 
 export default function Home() {
+    const { user } = useAuth();
+
+    // History is the home page once you're logged in.
+    if (user) {
+        return <Navigate to="/history" replace />;
+    }
+
     return (
         <div className="app">
             <Navbar />

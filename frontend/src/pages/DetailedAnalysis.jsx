@@ -1,34 +1,23 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import RequirementCard from "../components/RequirementCard";
+import ScanLoader from "../components/ScanLoader";
+import { useAnalysisResult } from "../hooks/useAnalysisResult";
 
 export default function DetailedAnalysis() {
-    const navigate = useNavigate();
-    const [result, setResult] = useState(null);
+    const { id } = useParams();
+    const { status, result } = useAnalysisResult();
 
-    useEffect(() => {
-        const stored =
-            sessionStorage.getItem(
-                "resumeLensResult"
-            );
-
-        if (!stored) {
-            navigate("/analyze");
-            return;
-        }
-
-        setResult(
-            JSON.parse(stored)
-        );
-    }, [navigate]);
-
-    if (!result) {
-        return null;
+    if (status === "missing") {
+        return <Navigate to="/history" replace />;
     }
 
+    const resultsPath = `/results/${id}`;
+
     const requirements =
-        result.requirements || [];
+        Array.isArray(result?.requirements)
+            ? result.requirements
+            : [];
 
     return (
         <div className="app">
@@ -40,7 +29,7 @@ export default function DetailedAnalysis() {
                 <div className="container animate-in">
 
                     <Link
-                        to="/results"
+                        to={resultsPath}
                         className="back-link"
                     >
                         ← Back to Results
@@ -55,20 +44,43 @@ export default function DetailedAnalysis() {
                         was evaluated against your resume.
                     </p>
 
-                    <div>
-                        {requirements.map(
-                            (requirement) => (
-                                <RequirementCard
-                                    key={
-                                        requirement.requirement_id
-                                    }
-                                    requirement={
-                                        requirement
-                                    }
-                                />
-                            )
-                        )}
-                    </div>
+                    {status === "loading" && (
+                        <div className="loading">
+                            <ScanLoader />
+                        </div>
+                    )}
+
+                    {status === "error" && (
+                        <div className="error" role="alert">
+                            Couldn't load this analysis. Please refresh
+                            the page.
+                        </div>
+                    )}
+
+                    {status === "ready" && (
+                        <div>
+                            {requirements.length === 0 && (
+                                <p className="card-description">
+                                    No requirement details were returned
+                                    for this analysis.
+                                </p>
+                            )}
+
+                            {requirements.map(
+                                (requirement, index) => (
+                                    <RequirementCard
+                                        key={
+                                            requirement.requirement_id ??
+                                            index
+                                        }
+                                        requirement={
+                                            requirement
+                                        }
+                                    />
+                                )
+                            )}
+                        </div>
+                    )}
 
                 </div>
 
