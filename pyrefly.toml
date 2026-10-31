@@ -1,0 +1,3 @@
+# Pyrefly (VS Code type checker): resolve imports from the project venv,
+# not whichever python3 is first on PATH (Anaconda here).
+python-interpreter-path = "venv/bin/python3"

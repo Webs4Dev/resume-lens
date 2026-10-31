@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import CategoryScores from "../components/CategoryScores";
 import StrengthCard from "../components/StrengthCard";
 import GapCard from "../components/GapCard";
 import ScoreRing from "../components/ScoreRing";
 import TiltCard from "../components/TiltCard";
-import { readStoredResult } from "../services/resultStorage";
+import ScanLoader from "../components/ScanLoader";
+import { useAnalysisResult } from "../hooks/useAnalysisResult";
 
 const DECISION_LABELS = {
     EXACT: "Exact",
@@ -18,10 +18,25 @@ const DECISION_LABELS = {
 };
 
 export default function Results() {
-    const [result] = useState(readStoredResult);
+    const { id } = useParams();
+    const { status, result, record } = useAnalysisResult();
 
-    if (!result) {
-        return <Navigate to="/analyze" replace />;
+    if (status === "loading") {
+        return <StatusPage loading />;
+    }
+
+    if (status === "error") {
+        return (
+            <StatusPage
+                title="Couldn't load this analysis"
+                message="Please check your connection and refresh the page."
+            />
+        );
+    }
+
+    if (status === "missing") {
+        // An id that doesn't exist (or isn't yours) goes back to History.
+        return <Navigate to="/history" replace />;
     }
 
     const analysis =
@@ -33,6 +48,8 @@ export default function Results() {
     const atsScore =
         analysis.ats_score ?? score.ats_score ?? 0;
 
+    const detailsPath = `/results/${id}/details`;
+
     return (
         <div className="app">
             <Navbar />
@@ -40,6 +57,28 @@ export default function Results() {
             <main className="page">
 
                 <div className="container">
+
+                    <div className="result-context">
+                        <Link to="/history" className="back-link">
+                            ← Back to History
+                        </Link>
+                        <p className="history-meta">
+                            {record.job_title}
+                            {" · "}
+                            {record.resume_filename}
+                            {" · "}
+                            {new Date(record.created_at).toLocaleDateString()}
+                        </p>
+
+                        {/* The exact JD this resume was scored against,
+                            saved with every run. */}
+                        <details className="jd-panel">
+                            <summary>Job description</summary>
+                            <p className="jd-text">
+                                {record.job_description}
+                            </p>
+                        </details>
+                    </div>
 
                     <div className="result-hero animate-in">
 
@@ -215,7 +254,7 @@ export default function Results() {
                     </section>
 
                     <Link
-                        to="/results/details"
+                        to={detailsPath}
                         className="detail-button"
                         style={{
                             display: "block",
@@ -227,6 +266,29 @@ export default function Results() {
 
                 </div>
 
+            </main>
+        </div>
+    );
+}
+
+function StatusPage({ loading = false, title, message }) {
+    return (
+        <div className="app">
+            <Navbar />
+
+            <main className="page">
+                <div className="container">
+                    <div className="loading" role={loading ? undefined : "alert"}>
+                        {loading ? (
+                            <ScanLoader />
+                        ) : (
+                            <>
+                                <h2>{title}</h2>
+                                <p>{message}</p>
+                            </>
+                        )}
+                    </div>
+                </div>
             </main>
         </div>
     );

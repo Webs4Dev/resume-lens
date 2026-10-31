@@ -21,3 +21,16 @@ n8n-runner/
 
 # Logs
 *.log
+# Local backend data (SQLite database + uploaded resumes)
+data/
+
+# Python
+venv/
+__pycache__/
+.pytest_cache/
+
+# Claude Code per-machine settings
+.claude/settings.local.json
+*.db
+*.db-wal
+*.db-shm

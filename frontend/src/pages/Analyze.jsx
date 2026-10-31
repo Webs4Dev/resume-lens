@@ -3,8 +3,7 @@ import { FileText, Upload, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import ScanLoader from "../components/ScanLoader";
-import { analyzeResume } from "../services/api";
-import { saveResult } from "../services/resultStorage";
+import { createAnalysis } from "../services/history";
 
 const MAX_FILE_MB = 5;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -14,6 +13,7 @@ export default function Analyze() {
     const navigate = useNavigate();
 
     const [resume, setResume] = useState(null);
+    const [jobTitle, setJobTitle] = useState("");
     const [jobDescription, setJobDescription] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -72,22 +72,21 @@ export default function Analyze() {
 
         setLoading(true);
 
+        // The backend runs the analysis and saves it in one request,
+        // so a result is never shown without being in your history.
         try {
-            const result = await analyzeResume(
-                resume,
-                jobDescription.trim()
-            );
+            const { id } = await createAnalysis({
+                file: resume,
+                jobTitle: jobTitle.trim(),
+                jobDescription: jobDescription.trim()
+            });
 
-            saveResult(result);
-
-            navigate("/results");
-
+            navigate(`/results/${id}`);
         } catch (err) {
             setError(
                 err.message ||
                 "Something went wrong while analyzing your resume."
             );
-        } finally {
             setLoading(false);
         }
     }
@@ -223,6 +222,35 @@ export default function Analyze() {
                                     )}
 
                                 </label>
+
+                            </div>
+
+                            <div className="form-group">
+
+                                <label
+                                    className="form-label"
+                                    htmlFor="job-title"
+                                >
+                                    Job Title <span className="optional">(optional)</span>
+                                </label>
+
+                                <input
+                                    id="job-title"
+                                    className="text-input"
+                                    type="text"
+                                    maxLength={200}
+                                    value={jobTitle}
+                                    onChange={(e) =>
+                                        setJobTitle(e.target.value)
+                                    }
+                                    placeholder="e.g. Backend Engineer at Acme"
+                                    aria-describedby="job-title-hint"
+                                />
+
+                                <p id="job-title-hint" className="input-hint">
+                                    Shown in your history. If empty, the first
+                                    line of the job description is used.
+                                </p>
 
                             </div>
 

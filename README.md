@@ -345,7 +345,13 @@ Embeddings
 - Semantic Similarity
 - Evidence-Grounded LLM Evaluation
 
-### Workflow / Backend
+### Backend
+
+- Python + FastAPI (accounts, history, file storage)
+- SQLite (users, sessions, analyses)
+- Local folder for uploaded resume PDFs
+
+### Workflow
 
 - n8n
 - n8n Webhooks
@@ -354,38 +360,37 @@ Embeddings
 
 ### Infrastructure
 
-- Docker
+- Docker (n8n + task runners)
 - n8n Task Runners
-- Cloudflare Tunnel
-
-### Deployment
-
-- Netlify — Frontend
-- n8n — AI processing backend
 
 ---
 
 # 📁 Project Structure
 
 ```text
-resume_ats_agent/
+resume-ats-agent/
 │
+├── backend/               FastAPI API: auth, history, calls the n8n webhook
+│   ├── routes/
+│   ├── auth.py
+│   ├── db.py
+│   ├── n8n.py
+│   └── main.py
+├── tests/                 pytest suite (n8n is faked; no API credits spent)
 ├── frontend/
-│   ├── public/
-│   │   └── _redirects
 │   ├── src/
+│   │   ├── auth/
 │   │   ├── components/
+│   │   ├── hooks/
 │   │   ├── pages/
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── .env.example
+│   │   └── services/
 │   ├── package.json
-│   └── vite.config.js
-│
-├──workflow/
-│  └── resume-ats-workflow.json
-│
-├── .gitignore
+│   └── vite.config.js     proxies /api to the backend
+├── workflow/
+│   └── resume_ats_workflow.json
+├── data/                  created at runtime: SQLite DB + resumes (gitignored)
+├── .env.example
+├── requirements.txt
 └── README.md
 ```
 
@@ -395,69 +400,72 @@ resume_ats_agent/
 
 ## Prerequisites
 
-Make sure you have the following installed:
-
-- Node.js
-- npm
-- n8n
+- Python 3.12+
+- Node.js and npm
+- n8n (Docker), with the ResumeLens workflow imported and active
 
 For the complete AI workflow, you will also need the external services and API credentials required by the imported n8n workflow.
 
+ResumeLens runs fully on your machine. The browser only talks to the local
+FastAPI backend; the backend is the only thing that calls the n8n webhook, so
+the webhook URL never appears in the frontend code.
+
+```text
+Browser ──/api──▶ Vite dev proxy ──▶ FastAPI (localhost:8000) ──▶ n8n webhook
+                                         │
+                                         └─ data/resumelens.db + data/resumes/
+```
+
 ---
 
-# 💻 Running the Frontend Locally
+# 💻 Running Locally
 
 Clone the repository:
 
 ```bash
 git clone <YOUR_GITHUB_REPOSITORY>
-cd resume_ats_agent
+cd resume-ats-agent
 ```
 
-Move into the frontend directory:
+## 1. Backend
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env      # then fill in N8N_WEBHOOK_URL
+uvicorn backend.main:app --reload
+```
+
+### Environment variables (`.env` in the project root)
+
+| Name | Required | Purpose |
+|---|---|---|
+| `N8N_WEBHOOK_URL` | yes | Production webhook URL of the ResumeLens n8n workflow |
+| `N8N_WEBHOOK_SECRET` | no | Shared secret sent as the `X-ResumeLens-Secret` header |
+| `DB_PATH` | no | SQLite file, default `data/resumelens.db` |
+| `RESUME_DIR` | no | Folder for uploaded PDFs, default `data/resumes` |
+
+> Do not commit `.env` to GitHub. The frontend needs no environment variables.
+
+## 2. Frontend
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
----
-
-## Environment Variables
-
-Create a file:
-
-```text
-frontend/.env
-```
-
-Add:
-
-```env
-VITE_N8N_WEBHOOK_URL=http://localhost:5678/webhook/your-webhook-path
-```
-
-If your n8n instance is publicly hosted, replace the value with your production webhook URL.
-
-> Do not commit `.env` to GitHub.
-
----
-
-## Start the Frontend
-
-```bash
 npm run dev
 ```
 
-The application will be available at the local Vite development URL, typically:
+Open http://localhost:5173, create an account, and run your first analysis.
+Every analysis is saved to your History, where you can reopen it, download
+the resume you uploaded, or delete it.
 
-```text
-http://localhost:5173
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+cd frontend && npm run lint && npm run build
 ```
 
 ---
@@ -467,25 +475,19 @@ http://localhost:5173
 The repository contains the exported ResumeLens n8n workflow:
 
 ```text
-n8n/workflows/resume-ats-workflow.json
+workflow/resume_ats_workflow.json
 ```
 
 ## Importing the Workflow
 
 1. Start your n8n instance.
 2. Open the n8n editor.
-3. Import `resume-ats-workflow.json`.
+3. Import `resume_ats_workflow.json`.
 4. Configure the required credentials.
 5. Verify the webhook configuration.
 6. Activate the workflow.
-7. Copy the webhook URL.
-8. Add the webhook URL to the frontend `.env` file.
-
-Example:
-
-```env
-VITE_N8N_WEBHOOK_URL=https://your-n8n-instance/webhook/your-webhook-path
-```
+7. Copy the production webhook URL.
+8. Put it in the backend `.env` as `N8N_WEBHOOK_URL`.
 
 ---
 
@@ -514,7 +516,7 @@ The task runners provide the required execution environment for supported JavaSc
 The n8n workflow is available at:
 
 ```text
-n8n/workflows/resume-ats-workflow.json
+workflow/resume_ats_workflow.json
 ```
 
 A new user can:
@@ -524,8 +526,8 @@ A new user can:
 3. Import the workflow.
 4. Configure their own API credentials.
 5. Configure the webhook.
-6. Start the frontend.
-7. Point `VITE_N8N_WEBHOOK_URL` to their n8n webhook.
+6. Put the webhook URL in the backend `.env` as `N8N_WEBHOOK_URL`.
+7. Start the backend and the frontend.
 
 This allows the project to be reproduced without sharing private credentials or n8n runtime data.
 

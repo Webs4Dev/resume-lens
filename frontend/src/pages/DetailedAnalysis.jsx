@@ -1,18 +1,21 @@
-import { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import Navbar from "../components/NavBar";
 import RequirementCard from "../components/RequirementCard";
-import { readStoredResult } from "../services/resultStorage";
+import ScanLoader from "../components/ScanLoader";
+import { useAnalysisResult } from "../hooks/useAnalysisResult";
 
 export default function DetailedAnalysis() {
-    const [result] = useState(readStoredResult);
+    const { id } = useParams();
+    const { status, result } = useAnalysisResult();
 
-    if (!result) {
-        return <Navigate to="/analyze" replace />;
+    if (status === "missing") {
+        return <Navigate to="/history" replace />;
     }
 
+    const resultsPath = `/results/${id}`;
+
     const requirements =
-        Array.isArray(result.requirements)
+        Array.isArray(result?.requirements)
             ? result.requirements
             : [];
 
@@ -26,7 +29,7 @@ export default function DetailedAnalysis() {
                 <div className="container animate-in">
 
                     <Link
-                        to="/results"
+                        to={resultsPath}
                         className="back-link"
                     >
                         ← Back to Results
@@ -41,28 +44,43 @@ export default function DetailedAnalysis() {
                         was evaluated against your resume.
                     </p>
 
-                    <div>
-                        {requirements.length === 0 && (
-                            <p className="card-description">
-                                No requirement details were returned
-                                for this analysis.
-                            </p>
-                        )}
+                    {status === "loading" && (
+                        <div className="loading">
+                            <ScanLoader />
+                        </div>
+                    )}
 
-                        {requirements.map(
-                            (requirement, index) => (
-                                <RequirementCard
-                                    key={
-                                        requirement.requirement_id ??
-                                        index
-                                    }
-                                    requirement={
-                                        requirement
-                                    }
-                                />
-                            )
-                        )}
-                    </div>
+                    {status === "error" && (
+                        <div className="error" role="alert">
+                            Couldn't load this analysis. Please refresh
+                            the page.
+                        </div>
+                    )}
+
+                    {status === "ready" && (
+                        <div>
+                            {requirements.length === 0 && (
+                                <p className="card-description">
+                                    No requirement details were returned
+                                    for this analysis.
+                                </p>
+                            )}
+
+                            {requirements.map(
+                                (requirement, index) => (
+                                    <RequirementCard
+                                        key={
+                                            requirement.requirement_id ??
+                                            index
+                                        }
+                                        requirement={
+                                            requirement
+                                        }
+                                    />
+                                )
+                            )}
+                        </div>
+                    )}
 
                 </div>
 
