@@ -13,11 +13,14 @@ checkers count keywords. ResumeLens splits the job description into individual r
 looks for concrete evidence of each one in the resume, and scores the result with a fixed,
 transparent formula. Every verdict links back to the resume lines that support it.
 
+![Results page for a sample resume: an ATS match score of 75 out of 100, rated Good Match, with a one-line verdict](docs/screenshots/results.png)
+
 ---
 
 ## Contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Scoring model](#scoring-model)
 - [Tech stack](#tech-stack)
@@ -51,6 +54,22 @@ transparent formula. Every verdict links back to the resume lines that support i
 - **Accounts and history.** Email and password accounts. Every analysis is saved with its
   resume PDF and job description, can be reopened, re-downloaded or deleted, and feeds a
   score-over-time chart.
+
+---
+
+## Screenshots
+
+The screenshots use a fictional resume and job description.
+
+| Category scores, strengths and gaps | Evidence for each requirement |
+|---|---|
+| ![Category scores for technical skills, responsibilities, education and soft skills, followed by the resume's strengths](docs/screenshots/strengths-gaps.png) | ![Two requirements expanded, each with its decision, confidence, explanation and the resume lines used as evidence](docs/screenshots/requirement-details.png) |
+| **New analysis** | **History** |
+| ![Analyze page with a resume PDF selected, a job title and a pasted job description](docs/screenshots/analyze.png) | ![History page with a score-over-time chart and a saved analysis that can be downloaded or deleted](docs/screenshots/history.png) |
+
+<img src="docs/screenshots/results-phone.png" alt="Results page on a phone, with the score ring and verdict stacked in one column" width="260">
+
+The layout adapts to phones: cards stack into a single column.
 
 ---
 
